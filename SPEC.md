@@ -207,11 +207,13 @@ The user pastes it.
 
 **Codex**
 
-- Codex shows `working`, `idle`, and `done` in the MVP.
-- Codex has no `waiting` status in the MVP. Section 5.2 explains why.
+- Codex shows `starting`, `working`, `idle`, `done`, and `unknown` in the MVP.
+- Codex has no `waiting` status in the MVP. Section 5.2 explains why. A `codex exec` session is never `waiting`.
 - Spyre finds live Codex sessions from the process list and the working directory (5.2 C).
+- A live Codex session with no thread row yet shows "Starting…". If there is still no thread row after `adapterRefreshTimeout`, it shows `unknown`.
+- A `codex exec` session shows with the label "exec" (5.2 C).
 - Known limit: two Codex sessions in the same folder show as one session (5.2 C).
-- ChatGPT desktop threads do not show as live in the MVP (5.2 C).
+- ChatGPT desktop threads are out of scope. Spyre never shows them (5.2 C).
 
 ### 4.6 Child sessions
 
@@ -389,7 +391,16 @@ Rules for the process scan:
 
 - Path: `~/.codex/state_5.sqlite`, table `threads` (verified).
 - The `5` is a schema version. Find the file by pattern `state_*.sqlite`. Pick the highest number.
-- Useful columns: `id`, `rollout_path`, `cwd`, `title`, `git_branch`, `updated_at_ms`, `archived`.
+- Useful columns: `id`, `rollout_path`, `cwd`, `git_branch`, `updated_at_ms`, `archived`, `cli_version`, `source`, `originator`. Spyre does not read `title`.
+- `source` and `originator` values seen with CLI 0.161.0 (verified):
+
+| Started by | `source` | `originator` |
+|------------|----------|--------------|
+| TUI (`codex`) | `vscode` | `codex-tui` |
+| `codex exec` | `exec` | `codex_exec` |
+| ChatGPT desktop app | `vscode`, `exec`, or JSON (subagent) | `Codex Desktop` |
+
+Older rows have other values, and often an empty `originator`.
 - Open read-only. Codex keeps this file open in WAL mode while it runs (verified). Never write, never checkpoint.
 
 **B. Rollout**
@@ -419,10 +430,15 @@ Lock files do not show liveness (verified):
 
 Use the process table instead:
 
-1. List processes whose executable (`proc_pidpath`) is named `codex` and that have a controlling terminal (`proc_pidinfo` `PROC_PIDTBSDINFO`, flag `PROC_FLAG_CONTROLT`). This drops the `app-server`, `app-server-daemon`, and `exec-server` processes. The ChatGPT app's `app-server` and `exec-server` have no controlling terminal (verified). The detached `app-server-daemon` is expected to have none (UNKNOWN, not verified).
-   - Spyre does not read process arguments. On macOS, `KERN_PROCARGS2` returns the arguments and the environment in one buffer.
+1. List processes whose executable (`proc_pidpath`) is named `codex` and that have a controlling terminal (`sysctl` `KERN_PROC_ALL`, flag `P_CONTROLT`). Drop executables under an `/app-server-daemon/` folder or inside an `.app` bundle. This keeps the TUI and `codex exec`. It drops the `app-server`, `app-server-daemon`, and `exec-server` processes, and the `codex` binaries that the ChatGPT app bundles.
+   - The ChatGPT app's `app-server` and `exec-server` have no controlling terminal (verified).
+   - The `app-server-daemon` has no controlling terminal (verified with CLI 0.161.0). The TUI starts it from its own copy, `~/.codex/packages/app-server-daemon/releases/<version>/bin/codex`. The TUI runs from `~/.codex/packages/standalone/releases/<version>/bin/codex`. One TUI started two daemon processes. Both are session leaders with no terminal. Their parent is the TUI at first, and PID 1 after the TUI exits.
+   - Spyre does not read process arguments. On macOS, `KERN_PROCARGS2` returns the arguments and the environment in one buffer. So Spyre cannot tell `codex exec` from the TUI by its process. The thread index tells them apart (step 3).
+   - All adapters share one process scanner (`ProcessScanner`). It lists processes once per refresh. Each adapter keeps its own filter.
 2. Read each process's working directory with `proc_pidinfo` (`PROC_PIDVNODEPATHINFO`). The TUI's working directory is the project folder (verified).
-3. Match each TUI to the non-archived thread with the same `cwd` and the newest `updated_at_ms`.
+3. Match each TUI to the non-archived thread with the same `cwd` and the newest `updated_at_ms`. Threads with `originator` `Codex Desktop` are skipped.
+   - A thread with `source` `exec` is a `codex exec` run (verified). Its record has `label` `exec`. It is never `waiting`.
+   - A live TUI in a folder with no thread row shows `starting` ("Starting…"), with the ID `codex:cwd:<folder>`. If there is still no thread row after `adapterRefreshTimeout` (2 s, measured with the injected clock), it shows `unknown`. A TUI has no thread row before its first turn.
 4. A thread with a matching live TUI is live. Its rollout tail gives `working` or `idle` (B). A rollout with records but no status event gives `idle`. An unreadable or unparsable rollout gives `unknown` and a diagnostic.
 5. A thread without a live TUI is `done`. Spyre reports it only while its `updated_at_ms` is less than 10 min old.
 6. When the thread index cannot be read, each live TUI folder shows as one `unknown` row, with a diagnostic.
@@ -430,9 +446,9 @@ Use the process table instead:
 Limits:
 
 - Two TUIs in the same folder cannot be told apart. Spyre shows one row for that folder: the thread with the newest `updated_at_ms`, with that thread's status. The other thread in that folder does not show, not even as `done`. The row stays live until the last TUI in that folder exits.
-- A TUI that has no thread row yet does not show.
+- A `codex exec` run with no controlling terminal, for example from a script, is not live. Its thread shows only as `done`.
 - Spyre compares paths as strings after it removes `.`, `..`, and a trailing `/`. It does not resolve symlinks.
-- ChatGPT desktop threads have no TUI. Not implemented in the MVP: Spyre never shows a desktop thread as live. A desktop thread updated in the last 10 min shows as `done`. Reason: no verified column tells desktop threads from TUI threads (`source` and `originator` values vary). See section 11.
+- ChatGPT desktop threads are out of scope. Spyre never shows them, not as live and not as `done`. Spyre skips each thread with `originator` `Codex Desktop`. Older desktop rows with an empty `originator` are not skipped. They come from older app versions, so in practice they are older than 10 min and do not show.
 
 **D. Codex hooks**
 
@@ -504,6 +520,7 @@ This is the contract in plain language. The code protocol must follow it.
   - waiting reason, when the source gives one,
   - last activity time,
   - parent session ID, for a child session,
+  - an optional mode label, for example `exec` for a `codex exec` run,
   - the format version of each source it read.
 - A list of diagnostics, for example "registry file could not be parsed". Diagnostics never contain message content or secrets.
 - A signal when the adapter's sources change, so the app can refresh.
@@ -601,7 +618,6 @@ Before Lab work starts:
 ## 11. Open questions
 
 1. How stable are these formats across versions? We need fixture files per version in tests.
-2. How does Spyre show a Codex desktop thread more reliably than "ChatGPT runs and recent update"?
 
 **Later**
 

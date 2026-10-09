@@ -15,23 +15,14 @@ private final class TestClock: Sendable {
     func advance(_ seconds: TimeInterval) { value.withLock { $0 += seconds } }
 }
 
-private final class FakeProcesses: ClaudeProcessProvider {
-    private let state = OSAllocatedUnfairLock(initialState: (list: [ClaudeProcess](), cwds: [Int32: String]()))
-
-    func set(_ list: [ClaudeProcess], cwds: [Int32: String] = [:]) { state.withLock { $0 = (list, cwds) } }
-    func processes() -> [ClaudeProcess] { state.withLock { $0.list } }
-    func isAlive(_ pid: Int32) -> Bool { state.withLock { $0.list.contains { $0.pid == pid } } }
-    func workingDirectory(of pid: Int32) -> String? { state.withLock { $0.cwds[pid] } }
-}
-
-private func claude(_ pid: Int32, parent: Int32 = 50, path: String = cliPath, start: Date = t0) -> ClaudeProcess {
-    ClaudeProcess(pid: pid, parentPID: parent, executablePath: path, startTime: start)
+private func claude(_ pid: Int32, parent: Int32 = 50, path: String = cliPath, start: Date = t0) -> ScannedProcess {
+    ScannedProcess(pid: pid, parentPID: parent, executablePath: path, startTime: start)
 }
 
 private struct Harness {
     let root: URL
     let clock = TestClock()
-    let processes = FakeProcesses()
+    let processes = FakeProcessScanner()
     let adapter: ClaudeCodeAdapter
 
     /// Copies the named session files and all transcripts into a fresh temp folder.
@@ -52,7 +43,7 @@ private struct Harness {
             )
         }
         let clock = clock
-        adapter = ClaudeCodeAdapter(claudeRoot: root, processProvider: processes, now: { clock.now })
+        adapter = ClaudeCodeAdapter(claudeRoot: root, processes: processes, now: { clock.now })
     }
 
     func session(_ file: String) -> URL { root.appendingPathComponent("sessions/\(file)") }
@@ -191,7 +182,7 @@ struct ClaudeCodeAdapterTests {
     @Test func childSessionFindsParentAndTranscriptStatus() async throws {
         let harness = try Harness(sessions: ["101.json"])
         defer { harness.cleanUp() }
-        let shell = ClaudeProcess(pid: 900, parentPID: 101, executablePath: "/bin/zsh")
+        let shell = ScannedProcess(pid: 900, parentPID: 101, executablePath: "/bin/zsh")
         harness.processes.set([claude(101), shell, claude(201, parent: 900)], cwds: [201: "/Users/you/Projects/app"])
 
         let child = try #require(await harness.refresh()["claude-child-201"])
@@ -217,7 +208,7 @@ struct ClaudeCodeAdapterTests {
     @Test func unreadableChildIsUnknownThenDone() async throws {
         let harness = try Harness(sessions: [])
         defer { harness.cleanUp() }
-        harness.processes.set([claude(203), ClaudeProcess(pid: 204, parentPID: 1, executablePath: "/usr/bin/node")])
+        harness.processes.set([claude(203), ScannedProcess(pid: 204, parentPID: 1, executablePath: "/usr/bin/node")])
 
         let snapshot = await harness.adapter.refresh()
         #expect(snapshot.sessions.map(\.id) == ["claude-child-203"])
@@ -243,8 +234,8 @@ struct ClaudeCodeAdapterTests {
             + "claude.app/Contents/MacOS/claude"
         let match = [cliPath, desktop]
         let noMatch = ["/usr/bin/node", "/Users/you/.local/share/claude/versions/", "/bin/claude-helper", "/bin/zsh"]
-        for path in match { #expect(ClaudeProcess(pid: 1, parentPID: 0, executablePath: path).isClaudeCode) }
-        for path in noMatch { #expect(!ClaudeProcess(pid: 1, parentPID: 0, executablePath: path).isClaudeCode) }
+        for path in match { #expect(ClaudeCodeAdapter.isClaudeCode(path)) }
+        for path in noMatch { #expect(!ClaudeCodeAdapter.isClaudeCode(path)) }
     }
 
     @Test func transcriptFolderNameEncodesCwd() {

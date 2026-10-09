@@ -63,6 +63,8 @@ public struct SessionRecord: Sendable, Identifiable, Equatable {
     public var isStale: Bool
     /// A child session (`SPEC.md` 4.6, EXPERIMENTAL). With no `parentID`, the row shows "child, no parent".
     public var isChildSession: Bool
+    /// A short mode label for the row, for example `exec` for a `codex exec` run. `nil` for an interactive session.
+    public var label: String?
 
     public init(
         id: String,
@@ -75,7 +77,8 @@ public struct SessionRecord: Sendable, Identifiable, Equatable {
         lastActivity: Date,
         parentID: String? = nil,
         isStale: Bool = false,
-        isChildSession: Bool = false
+        isChildSession: Bool = false,
+        label: String? = nil
     ) {
         self.id = id
         self.agent = agent
@@ -88,6 +91,7 @@ public struct SessionRecord: Sendable, Identifiable, Equatable {
         self.parentID = parentID
         self.isStale = isStale
         self.isChildSession = isChildSession
+        self.label = label
     }
 
     /// The last path component of the working directory.
