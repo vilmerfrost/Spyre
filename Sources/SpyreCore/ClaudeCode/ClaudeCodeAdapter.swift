@@ -21,7 +21,7 @@ public actor ClaudeCodeAdapter: AgentAdapter {
     private nonisolated let sessionsDirectory: URL
     private let registry: ClaudeRegistryReader
     private let transcripts: ClaudeTranscriptReader
-    private let processProvider: any ClaudeProcessProvider
+    private let processScanner: any ProcessScanner
     private let config: SpyreConfig
     private let now: @Sendable () -> Date
 
@@ -39,7 +39,7 @@ public actor ClaudeCodeAdapter: AgentAdapter {
     /// - Parameter claudeRoot: the Claude Code folder, normally `~/.claude`. Tests pass a temp folder.
     public init(
         claudeRoot: URL,
-        processProvider: any ClaudeProcessProvider = SystemClaudeProcessProvider(),
+        processes: any ProcessScanner = SystemProcessScanner(),
         config: SpyreConfig = .default,
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
@@ -48,14 +48,14 @@ public actor ClaudeCodeAdapter: AgentAdapter {
         transcripts = ClaudeTranscriptReader(
             projectsDirectory: claudeRoot.appendingPathComponent("projects", isDirectory: true)
         )
-        self.processProvider = processProvider
+        self.processScanner = processes
         self.config = config
         self.now = now
     }
 
     public func refresh() async -> AdapterSnapshot {
         let time = now()
-        let processes = processProvider.processes()
+        let processes = processScanner.processes()
         let byPID = Dictionary(processes.map { ($0.pid, $0) }) { first, _ in first }
         let reads = registry.read().sorted { $0.pid < $1.pid }
         var diagnostics: [AdapterDiagnostic] = []
@@ -65,7 +65,7 @@ public actor ClaudeCodeAdapter: AgentAdapter {
         for read in reads {
             let key = "r\(read.pid)"
             seen.insert(key)
-            let alive = processProvider.isAlive(read.pid) && !Self.isReused(read.entry, process: byPID[read.pid])
+            let alive = processScanner.isAlive(read.pid) && !Self.isReused(read.entry, process: byPID[read.pid])
             var item = tracked[key] ?? Tracked(record: placeholder(pid: read.pid, now: time), firstSeen: time)
             if alive, item.doneSince != nil {
                 item = Tracked(record: placeholder(pid: read.pid, now: time), firstSeen: time)
@@ -168,11 +168,19 @@ public actor ClaudeCodeAdapter: AgentAdapter {
     }
 
     /// `SPEC.md` 5.1 A: a live PID whose process started after the registry session is a reused PID.
-    static func isReused(_ entry: ClaudeRegistryEntry?, process: ClaudeProcess?) -> Bool {
+    static func isReused(_ entry: ClaudeRegistryEntry?, process: ScannedProcess?) -> Bool {
         guard let start = process?.startTime, let entry else { return false }
         let registered = entry.startedAt.map { Date(timeIntervalSince1970: $0 / 1000) } ?? entry.procStartDate
         guard let registered else { return false }
         return start.timeIntervalSince(registered) > pidReuseTolerance
+    }
+
+    /// `SPEC.md` 5.1 D: match on the executable path, never on the process name.
+    static func isClaudeCode(_ executablePath: String) -> Bool {
+        if executablePath.hasSuffix("/claude") { return true }
+        guard let range = executablePath.range(of: "/.local/share/claude/versions/") else { return false }
+        let version = executablePath[range.upperBound...]
+        return !version.isEmpty && !version.contains("/")
     }
 
     // MARK: - Child sessions (EXPERIMENTAL, SPEC.md 4.6)
@@ -181,13 +189,13 @@ public actor ClaudeCodeAdapter: AgentAdapter {
     /// The parent is the first process up the parent-PID chain that has a registry file.
     /// Status comes from the transcript tail. Two children in one folder can be matched to the wrong transcript.
     private func scanChildSessions(
-        processes: [ClaudeProcess], byPID: [Int32: ClaudeProcess], reads: [ClaudeRegistryRead], now: Date,
+        processes: [ScannedProcess], byPID: [Int32: ScannedProcess], reads: [ClaudeRegistryRead], now: Date,
         seen: inout Set<String>
     ) -> [AdapterDiagnostic] {
         let registryPIDs = Set(reads.map(\.pid))
         var claimed = Set(reads.compactMap(\.entry?.sessionId))
         var diagnostics: [AdapterDiagnostic] = []
-        let children = processes.filter { $0.isClaudeCode && !registryPIDs.contains($0.pid) }
+        let children = processes.filter { Self.isClaudeCode($0.executablePath) && !registryPIDs.contains($0.pid) }
             .sorted { $0.pid < $1.pid }
 
         for process in children {
@@ -197,7 +205,7 @@ public actor ClaudeCodeAdapter: AgentAdapter {
                 lastActivity: process.startTime ?? now, isChildSession: true
             )
             record.parentID = parentRecordID(of: process, byPID: byPID, registryPIDs: registryPIDs)
-            let cwd = processProvider.workingDirectory(of: process.pid)
+            let cwd = processScanner.workingDirectory(of: process.pid)
             if let cwd {
                 // A readable folder with no unclaimed transcript is not shown. Desktop-app helper processes
                 // without a registry file or transcript were observed; they are not sessions.
@@ -227,7 +235,7 @@ public actor ClaudeCodeAdapter: AgentAdapter {
         return diagnostics
     }
 
-    private func parentRecordID(of process: ClaudeProcess, byPID: [Int32: ClaudeProcess],
+    private func parentRecordID(of process: ScannedProcess, byPID: [Int32: ScannedProcess],
                                 registryPIDs: Set<Int32>) -> String? {
         var pid = process.parentPID
         for _ in 0..<32 {
