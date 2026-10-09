@@ -7,6 +7,7 @@ struct CountLine: View {
     let content: CountLineContent
     var compact = false
     @Environment(\.tokens) private var tokens
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Group {
@@ -40,7 +41,7 @@ struct CountLine: View {
             Text("\(value)")
                 .font(tokens.font(compact ? "countCompact" : "count").monospacedDigit())
                 .foregroundStyle(tokens.color(number))
-                .contentTransition(.numericText())
+                .contentTransition(reduceMotion ? .identity : .numericText())
             Text(label)
                 .font(tokens.font("body"))
                 .foregroundStyle(tokens.color(muted))
@@ -53,35 +54,88 @@ struct CountLine: View {
 struct SessionListView: View {
     let sessions: [SessionRecord]
     let now: Date
+    /// The main window focus. The list is one keyboard stop; ↑/↓ move inside it.
+    var focus: FocusState<MainFocus?>.Binding
+    /// Scrolls the list to an item.
+    var scrollTo: (RadarItem) -> Void = { _ in }
     @Environment(AppModel.self) private var model
     @Environment(\.tokens) private var tokens
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Namespace private var rotor
 
     /// The row order while the pointer is over the list. Rows never move under the pointer. `SPEC.md` 4.2.
     @State private var frozen: [SessionSection]?
+    /// The item with the keyboard focus inside the list.
+    @State private var cursor: RadarItem?
+    /// The ring shows for keyboard focus only. A click hides it.
+    @State private var keyboardDriven = false
 
     var body: some View {
         let fold = IdleFold(now: now, after: model.config.idleFoldAfter, isExpanded: model.earlierExpanded)
         let fresh = sessions.sections(expanded: model.expandedGroups, idleFold: fold)
         let shown = frozen.map { fresh.frozen(to: $0) } ?? fresh
+        let navigation = RadarNavigation(sections: shown)
+        let ring = focus.wrappedValue == .list && keyboardDriven ? navigation.resolve(cursor) : nil
+        let titles = Dictionary(sessions.map { ($0.id, Self.title($0)) }) { first, _ in first }
         VStack(alignment: .leading, spacing: tokens.value("space.lg")) {
             ForEach(shown) { section in
                 VStack(alignment: .leading, spacing: tokens.value("space.sm")) {
-                    if section.isCollapsible {
-                        DisclosureHeader(section: section) { toggle(section.group) }
-                    } else {
-                        GroupHeader(section: section)
+                    Group {
+                        if section.isCollapsible {
+                            DisclosureHeader(section: section) { toggle(section.group) }
+                        } else {
+                            GroupHeader(section: section)
+                        }
                     }
+                    .focusRingAnchor(ring == .header(section.group))
+                    .id(RadarItem.header(section.group))
                     if !section.visibleRows.isEmpty || section.showsEarlier {
-                        panel(section)
+                        panel(section, ring: ring, titles: titles)
                     }
                 }
             }
         }
+        .focusRingOverlay()
+        .focusable()
+        .focused(focus, equals: .list)
+        .focusEffectDisabled()
+        .onKeyPress(keys: RadarKey.keys) { press in
+            guard let key = RadarKey(press) else { return .ignored }
+            keyboardDriven = true
+            return apply(navigation.handle(key, focused: navigation.resolve(cursor)), shown: shown)
+        }
         .onHover { inside in frozen = inside ? shown : nil }
+        .simultaneousGesture(TapGesture().onEnded { keyboardDriven = false })
+        .accessibilityElement(children: .contain)
+        .accessibilityRotor("Needs you") {
+            ForEach(shown.filter { $0.group == .waiting }.flatMap(\.visibleRows)) { row in
+                AccessibilityRotorEntry(Text(titles[row.id] ?? ""), id: row.id, in: rotor)
+            }
+        }
     }
 
-    private func panel(_ section: SessionSection) -> some View {
+    private static func title(_ record: SessionRecord) -> String {
+        SessionRowText(record, homeDirectory: NSHomeDirectory()).title
+    }
+
+    private func apply(_ command: RadarCommand, shown: [SessionSection]) -> KeyPress.Result {
+        let rows = shown.flatMap { $0.rows + $0.earlierRows }
+        switch command {
+        case .none: return .handled
+        case .focus(let item):
+            cursor = item
+            scrollTo(item)
+        case .toggleGroup(let group): toggle(group)
+        case .toggleEarlier: withFold { model.earlierExpanded.toggle() }
+        case .showApp(let id): if let row = rows.first(where: { $0.id == id }) { model.showApp(row.session) }
+        case .toggleDetail(let id):
+            if let row = rows.first(where: { $0.id == id }) { model.toggleDetail(row.session) }
+        case .focusSwitcher: focus.wrappedValue = .switcher
+        }
+        return .handled
+    }
+
+    private func panel(_ section: SessionSection, ring: RadarItem?, titles: [String: String]) -> some View {
         let waiting = section.group == .waiting
         return Panel(
             surface: waiting ? "color.surface.waiting" : "color.surface.row",
@@ -89,19 +143,31 @@ struct SessionListView: View {
         ) {
             ForEach(Array(section.visibleRows.enumerated()), id: \.element.id) { index, row in
                 if index > 0 { RowDivider() }
-                SessionRow(row: row, group: section.group, now: now)
+                sessionRow(row, section: section, ring: ring, titles: titles)
             }
             if section.showsEarlier {
                 if !section.visibleRows.isEmpty { RowDivider() }
                 EarlierRow(count: section.earlierCount, isExpanded: section.isEarlierExpanded) {
                     withFold { model.earlierExpanded.toggle() }
                 }
+                .focusRingAnchor(ring == .earlier)
+                .id(RadarItem.earlier)
                 ForEach(section.visibleEarlierRows) { row in
                     RowDivider()
-                    SessionRow(row: row, group: section.group, now: now)
+                    sessionRow(row, section: section, ring: ring, titles: titles)
                 }
             }
         }
+    }
+
+    private func sessionRow(
+        _ row: SessionListRow, section: SessionSection, ring: RadarItem?, titles: [String: String]
+    ) -> some View {
+        let parent = row.isNested ? row.session.parentID.flatMap { titles[$0] } : nil
+        return SessionRow(row: row, group: section.group, now: now, parentTitle: parent)
+            .focusRingAnchor(ring == .row(row.id))
+            .id(RadarItem.row(row.id))
+            .accessibilityRotorEntry(id: row.id, in: rotor)
     }
 
     private func toggle(_ group: StatusGroup) {
@@ -149,7 +215,7 @@ private struct EarlierRow: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .accessibilityLabel("Earlier, \(count) sessions")
+        .accessibilityLabel(RadarSpeech.disclosureLabel("Earlier", count: count))
         .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
     }
 }
@@ -193,7 +259,8 @@ private struct DisclosureHeader: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .accessibilityLabel("\(section.group.title), \(section.count) sessions")
+        .accessibilityLabel(RadarSpeech.disclosureLabel(section.group.title, count: section.count))
+        .accessibilityAddTraits(.isHeader)
         .accessibilityValue(section.isExpanded ? "Expanded" : "Collapsed")
         .accessibilityHint(section.isExpanded ? "Hides these sessions." : "Shows these sessions.")
     }

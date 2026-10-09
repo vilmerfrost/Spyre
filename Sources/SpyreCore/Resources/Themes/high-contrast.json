@@ -21,6 +21,7 @@
     "color.border.row": "#2B2F36",
     "color.border.divider": "#2B2F3640",
     "color.border.waiting": "#6B3A00",
+    "color.border.strong": "#000000",
     "color.text.primary": "#000000",
     "color.text.secondary": "#2B2F36",
     "color.text.onAccent": "#FFFFFF",

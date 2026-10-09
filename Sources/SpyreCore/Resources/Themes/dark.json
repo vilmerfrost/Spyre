@@ -23,6 +23,7 @@
     "color.border.row": "#FFFFFF17",
     "color.border.divider": "#FFFFFF0D",
     "color.border.waiting": "#E0A84E4D",
+    "color.border.strong": "#FFFFFF73",
     "color.text.primary": "#E4E7EA",
     "color.text.secondary": "#9AA2AC",
     "color.text.onAccent": "#14171B",

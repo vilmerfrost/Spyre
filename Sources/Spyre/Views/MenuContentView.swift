@@ -25,6 +25,10 @@ struct MenuBarLabel: View {
 struct MenuContentView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.tokens) private var tokens
+    /// The row with keyboard focus. The rows are one keyboard stop; ↑/↓ move inside it. Esc closes the window
+    /// (the system handles it).
+    @State private var cursor: RadarItem?
+    @FocusState private var rowsFocused: Bool
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
@@ -51,13 +55,7 @@ struct MenuContentView: View {
                 CountLine(content: CountLineContent(SessionCounts(sessions)), compact: true)
             }
             if !panel.rows.isEmpty {
-                Panel {
-                    ForEach(Array(panel.rows.enumerated()), id: \.element.row.id) { index, entry in
-                        if index > 0 { RowDivider() }
-                        SessionRow(row: entry.row, group: entry.group, now: now, compact: true)
-                            .background(tokens.color("color.surface.waiting").opacity(entry.group == .waiting ? 1 : 0))
-                    }
-                }
+                rows(panel, now: now)
             }
             if let more = panel.moreText {
                 Button(more) { model.showMainWindow() }
@@ -75,6 +73,33 @@ struct MenuContentView: View {
             footer.padding(.top, tokens.value("space.xs"))
         }
         .padding(tokens.value("space.lg"))
+    }
+
+    private func rows(_ panel: MenuPanelContent, now: Date) -> some View {
+        let navigation = RadarNavigation(rows: panel.rows.map(\.row))
+        let ring = rowsFocused ? navigation.resolve(cursor) : nil
+        return Panel {
+            ForEach(Array(panel.rows.enumerated()), id: \.element.row.id) { index, entry in
+                if index > 0 { RowDivider() }
+                SessionRow(row: entry.row, group: entry.group, now: now, compact: true)
+                    .background(tokens.color("color.surface.waiting").opacity(entry.group == .waiting ? 1 : 0))
+                    .focusRingAnchor(ring == .row(entry.row.id))
+            }
+        }
+        .focusRingOverlay()
+        .focusable()
+        .focused($rowsFocused)
+        .focusEffectDisabled()
+        .onKeyPress(keys: [.upArrow, .downArrow, .return]) { press in
+            guard let key = RadarKey(press) else { return .ignored }
+            switch navigation.handle(key, focused: navigation.resolve(cursor)) {
+            case .focus(let item): cursor = item
+            case .showApp(let id):
+                if let row = panel.rows.first(where: { $0.row.id == id })?.row { model.showApp(row.session) }
+            default: break
+            }
+            return .handled
+        }
     }
 
     /// "Open Spyre", the shortcut hint, then "Show welcome screen" and "Quit Spyre".
