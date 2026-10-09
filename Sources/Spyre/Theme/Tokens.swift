@@ -1,3 +1,4 @@
+import AppKit
 import SpyreCore
 import SwiftUI
 
@@ -21,17 +22,31 @@ struct Tokens: Sendable {
         theme: Theme(spyreTheme: Theme.supportedVersion, name: "Fallback", appearance: "light", tokens: [:])
     )
 
+    /// The macOS appearance for windows and system controls. It always matches the theme. `DESIGN.md` 7.
+    var appearance: NSAppearance? {
+        NSAppearance(named: theme.isDark ? .darkAqua : .aqua)
+    }
+
+    var colorScheme: ColorScheme { theme.isDark ? .dark : .light }
+
     func color(_ token: String) -> Color {
         guard let rgba = theme.color(token) else { return .primary }
         return Color(.sRGB, red: rgba.red, green: rgba.green, blue: rgba.blue, opacity: rgba.alpha)
+    }
+
+    /// A token color for Core Animation layers.
+    func cgColor(_ token: String) -> CGColor {
+        guard let rgba = theme.color(token) else { return CGColor(gray: 0.5, alpha: 1) }
+        return CGColor(srgbRed: rgba.red, green: rgba.green, blue: rgba.blue, alpha: rgba.alpha)
     }
 
     func value(_ token: String) -> CGFloat {
         CGFloat(theme.number(token) ?? 0)
     }
 
+    /// The font for a role: `font.<role>.size` and `font.<role>.weight`.
     func font(_ role: String) -> Font {
-        .system(size: value("font.\(role).size"))
+        .system(size: value("font.\(role).size"), weight: weight(theme.string("font.\(role).weight")))
     }
 
     func icon(_ token: String) -> String {
@@ -44,6 +59,21 @@ struct Tokens: Sendable {
 
     func statusIcon(_ status: SessionStatus) -> String {
         icon("icon.status.\(status.tokenName)")
+    }
+
+    /// A motion duration. `0` under Reduce Motion, so changes happen at once. `DESIGN.md` 10.3.
+    func duration(_ token: String, reduceMotion: Bool) -> Double {
+        reduceMotion ? 0 : Double(value(token))
+    }
+
+    private func weight(_ name: String?) -> Font.Weight {
+        switch name {
+        case "light": .light
+        case "medium": .medium
+        case "semibold": .semibold
+        case "bold": .bold
+        default: .regular
+        }
     }
 }
 

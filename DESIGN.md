@@ -14,21 +14,77 @@ Spyre has no fixed brand look. The user owns the look.
 
 ## 2. Default theme direction
 
-The default themes are calm and clean.
+The default themes follow the Vilmer design system v1.1. Its "Atmosphere and Light" section wins conflicts.
+In short: a precise, calm tool that floats over quiet fog and distant mountains.
 
-- Use a lot of space. Do not fill every gap.
-- Give each card one primary action. Hide other actions until hover or a context menu.
-- Put translucent frosted-glass cards on a quiet background.
-- Use a large corner radius on cards. Use pill-shaped controls.
-- Show key numbers big and calm, for example "3 waiting". Use a light weight and monospaced digits.
-- Use graphite text, not pure black. Do not use pure white as the main background.
-- Use the accent color rarely: selection, focus, and one primary action. Not as a fill for large areas.
-- Use status colors only for status. Do not use them for decoration.
-- Keep motion short and fast. The user must never wait for an animation.
+- The window content rests on an atmospheric background (2.1). The background is never one flat color.
+- Use graphite text, not pure black. Do not use pure white as the main surface.
+- Compact but breathable. Show what matters first. Fold the rest (progressive disclosure).
+- Hierarchy comes from layout, spacing, type, and contrast first. Color comes last.
+- Use thin, crisp, low-contrast borders. Use restrained shadows.
+- Use mixed radius by hierarchy: small radius on panels and rows, a pill shape only on the section switcher.
+- No giant rounded cards. A group of sessions is one thin bordered panel with rows and hairline dividers.
+- Show key numbers big and calm, with a light weight and tabular digits, for example "2 needs you".
+- Use frost-blue (`color.accent`) as a signature only: focus, selection, and the one primary button.
+- Use status colors only for status. Only "needs you" uses the waiting color in the count line.
+- Status indicators are sparing: one glyph per row, and text where the group header does not say it.
+- Reveal secondary actions on hover, and always also in a context menu.
+- Keep motion short and fast. The user never waits for an animation.
+- Glass is rare. The MVP uses opaque surfaces.
 
-This default look stays for the MVP. It respects macOS "Reduce Transparency" (10.2).
+This direction replaces the v0.1 default ("frosted-glass cards, large radius"). The design system and the
+approved redesign supersede the earlier "keep the default look" decision.
 
-### 2.1 Dock (v0.2)
+### 2.1 Atmosphere
+
+Every window has an atmospheric background: soft layered fog over faint, low-contrast mountain ridges.
+Spyre draws it natively (SwiftUI shapes and blur). It uses no image and no network.
+
+- Layers, back to front: sky-to-horizon tonal falloff, faint warm light, far ridge, fog band, middle ridge,
+  fog band, near ridge. Far ridges sit higher and are softer.
+- The scene geometry is fixed (`Atmosphere` in SpyreCore). Colors, opacity, blur, and drift are tokens.
+- Strength: `opacity.atmosphere.scenery` on key screens (the welcome window).
+  Dense screens (the session list, the menubar window) multiply it by `opacity.atmosphere.dense`.
+  The atmosphere is reduced there, never removed.
+- Ambient motion: the two fog bands drift very slowly in opposite directions, `size.atmosphere.drift` points
+  each way, one cycle per `motion.duration.drift` seconds. The ridges stay still.
+  Core Animation runs the drift in the render server, so it costs almost no app CPU and never re-lays out
+  the window. Under Reduce Motion the scene stays and the drift stops.
+- The fog bands are radial fades (no blur filter). The ridges use `blur.atmosphere.ridge`.
+- The environment never changes with app state. State shows in the UI only.
+- It is decoration: hidden from VoiceOver and never hit-tested.
+
+### 2.2 Light and dark
+
+Spyre follows the macOS appearance, live:
+
+- Light appearance: **Fog Light** (`light.json`). Cloud-gray and mist-gray, graphite text.
+- Dark appearance: **Fog Dark** (`dark.json`). A night fog: deep blue-graphite sky, distant ridges a little lighter
+  than near ones (night atmospheric perspective), a very faint warm light, and soft gray text. It is designed
+  as its own theme, not an inverted light theme. Reason: Spyre is a monitoring tool that stays open for long
+  sessions, often next to dark terminals.
+- **High Contrast** (`high-contrast.json`) is light only. Spyre does not pick it automatically. It is for a later
+  theme setting.
+- Spyre sets each window's macOS appearance (`NSWindow.appearance`) to the theme's `appearance`. The title bar,
+  scroll bars, and any system control always match the theme.
+- Spyre reads the system appearance from `NSApp.effectiveAppearance` and observes it (key-value observing).
+  Spyre never sets the app-wide appearance, so this value always reflects the system.
+- Hidden launch argument for visual checks: `-SpyreAppearance light` or `-SpyreAppearance dark`.
+  It forces the followed appearance. It is read from the launch arguments only. Nothing is stored.
+  (The `-AppleInterfaceStyle` argument does not change the app appearance on current macOS.)
+
+### 2.3 Visual checks
+
+Hidden launch arguments, for looking at the UI without a change to system settings or real data:
+
+- `-SpyreAppearance light|dark`: see 2.2.
+- `-SpyreDemo`: show the fixed fake sessions of `FakeAdapter` instead of reading `~/.claude` and `~/.codex`.
+- `-SpyreMenuPreview` (debug builds only): show the menubar window content in a normal window. Use it when the
+  menubar hides the Spyre icon, so the real menubar window opens off screen.
+
+Example: `open -n Spyre.app --args -SpyreAppearance dark -SpyreDemo`, then `open Spyre.app` again for the main window.
+
+### 2.4 Dock (v0.2)
 
 The dock is not in the MVP. It is planned for v0.2.
 The MVP defines the dock tokens now, so that themes stay valid in v0.2.
@@ -43,11 +99,21 @@ The dock is a vertical strip on one screen edge.
 - Hover an icon to show a tooltip with project name and status label.
 - Position: left, right, or hidden. Default: hidden.
 
-### 2.2 Cards
+### 2.5 Rows and groups
 
-- A session card shows agent, project, branch, status, and last activity.
-- The primary action is "Open project".
-- A child session card sits under its parent card, indented.
+- The content column has a maximum width (`size.content.maxWidth`). In a wide window it is centered.
+- A group of sessions is one panel: `color.surface.row`, `color.border.row`, `radius.panel`, hairline dividers.
+- "Needs you" is first. Its panel has a warning-tinted border (`color.border.waiting`) and surface
+  (`color.surface.waiting`).
+- Idle and Done are folded by default behind a disclosure row with a count.
+- A row is about `size.row.height` high. Line 1: title. Line 2 (muted): project · branch · agent, then tags.
+- Right side: the waiting reason or the no-activity flag, then the relative last activity in tabular digits.
+  In the compact menubar rows this note moves to the start of line 2, so the title keeps its room.
+- Idle and Done row titles use `color.text.secondary`, so rows that need attention lead.
+- A working row shows a slow spinner (one turn per `motion.duration.ring`, run by Core Animation).
+  Under Reduce Motion it is a static partial arc.
+- A child row sits under its parent with a small corner arrow (`icon.child`) and the "experimental" tag.
+- Hover shows "Open folder". The context menu has the same action.
 
 ## 3. Token rules
 
@@ -85,83 +151,122 @@ Token names use dot-separated parts: `category.role.variant`.
 
 ## 5. Core tokens
 
-Default values are for the built-in light theme.
-The dark and high-contrast themes set their own values.
+Default values are for the built-in light theme (Fog Light). It holds the full token set.
+Fog Dark and High Contrast set their own colors and atmosphere strength. Other tokens come from Fog Light.
+The Dark column shows the Fog Dark value. "=" means the light value.
 
 ### 5.1 Color
 
-| Token | Default (light) | Use |
-|-------|-----------------|-----|
-| `color.background.base` | `#E6E8EB` | Quiet mist-gray background |
-| `color.background.gradientTop` | `#ECEDEF` | Top of the optional gradient background |
-| `color.background.gradientBottom` | `#DADDE2` | Bottom of the optional gradient background |
-| `color.surface.card` | `#F7F8F9` | Card fill, before `opacity.card` |
-| `color.surface.cardHover` | `#FFFFFF` | Card fill on hover |
-| `color.surface.dock` | `#F2F3F5` | Dock fill, before `opacity.dock` |
-| `color.border.subtle` | `#1F232814` | Thin card border |
-| `color.text.primary` | `#1F2328` | Graphite main text |
-| `color.text.secondary` | `#535A64` | Labels, metadata |
-| `color.text.onAccent` | `#1F2328` | Text on an accent fill. Spyre derives it from the accent. |
-| `color.accent` | `#8FB4D9` | Restrained frost-blue. Selection, focus, primary action. |
-| `color.focus` | `#3F7FBF` | Focus ring |
-| `color.status.working` | `#2F66A3` | Working |
-| `color.status.waiting` | `#8A5300` | Waiting |
-| `color.status.idle` | `#5B616B` | Idle |
-| `color.status.done` | `#24713F` | Done |
-| `color.status.unknown` | `#6A5F52` | Unknown |
-| `color.flag.noActivity` | `#8A5300` | No-activity flag on a working row |
+| Token | Light | Dark | Use |
+|-------|-------|------|-----|
+| `color.background.base` | `#E3E5E8` | `#14171B` | Window base, under the atmosphere |
+| `color.background.gradientTop` / `gradientBottom` | not set | not set | Reserved for the gradient background choice (8) |
+| `color.atmosphere.sky` | `#E7E8EA` | `#121519` | Top of the atmosphere |
+| `color.atmosphere.horizon` | `#D8DCE1` | `#1E2329` | Horizon tone, at `Atmosphere.horizonStop` |
+| `color.atmosphere.fog` | `#E9EAEB` | `#1A1E23` | Foreground mist and fog bands |
+| `color.atmosphere.ridgeFar` | `#A9B1BC` | `#353D48` | Far ridge (blue-gray) |
+| `color.atmosphere.ridgeMid` | `#BEC4CC` | `#2A3139` | Middle ridge |
+| `color.atmosphere.ridgeNear` | `#D0D4D9` | `#1E2328` | Near ridge |
+| `color.atmosphere.light` | `#EAD9BE` | `#4A4032` | Faint warm light behind the far ridge |
+| `color.surface.card` | `#F2F2F1` | `#1C2025` | Welcome panel |
+| `color.surface.row` | `#F2F2F1` | `#1C2025` | Session panel and row fill |
+| `color.surface.rowHover` | `#F8F8F7` | `#22272D` | Row on hover, disclosure row on hover |
+| `color.surface.waiting` | `#F5F0E7` | `#221F1A` | "Needs you" panel fill |
+| `color.surface.control` | `#1F23280D` | `#FFFFFF0D` | Section switcher track (translucent) |
+| `color.surface.controlSelected` | `#F8F8F7` | `#2A3037` | Selected switcher segment, secondary button |
+| `color.border.subtle` | `#1F232814` | `#FFFFFF14` | Thin borders on controls |
+| `color.border.row` | `#1F23281F` | `#FFFFFF17` | Panel border |
+| `color.border.divider` | `#1F232812` | `#FFFFFF0D` | Hairline between rows |
+| `color.border.waiting` | `#8A530066` | `#E0A84E59` | Warning-tinted "Needs you" panel border |
+| `color.text.primary` | `#1F2328` | `#E4E7EA` | Graphite main text |
+| `color.text.secondary` | `#545B65` | `#9AA2AC` | Labels, metadata, muted counts |
+| `color.text.onAccent` | `#1F2328` | `#14171B` | Text on the accent fill |
+| `color.accent` | `#8FB4D9` | `#8FB4D9` | Frost-blue signature. Focus, selection, primary button. |
+| `color.focus` | `#3F7FBF` | `#8FB4D9` | Focus ring |
+| `color.status.working` | `#2A5E98` | `#83AEDF` | Working |
+| `color.status.waiting` | `#8A5300` | `#E0A84E` | Waiting ("needs you") |
+| `color.status.idle` | `#5B616B` | `#98A0AA` | Idle |
+| `color.status.done` | `#20663A` | `#6DBF8A` | Done |
+| `color.status.unknown` | `#6A5F52` | `#B3A797` | Unknown, starting |
+| `color.flag.noActivity` | `#8A5300` | `#E0A84E` | No-activity flag on a working row |
+| `color.shadow.panel` | `#1F23280F` | `#00000040` | Soft panel shadow |
+| `color.surface.dock` | not set | not set | Reserved: dock fill (v0.2) |
 
 ### 5.2 Shape, space, and size
 
 | Token | Default | Use |
 |-------|---------|-----|
-| `radius.card` | `20` | Cards |
-| `radius.row` | `12` | Rows inside a card or list |
-| `radius.popover` | `14` | Menubar list, tooltips |
-| `radius.control` | `capsule` | Buttons, toggles, segmented controls |
-| `space.xs` / `sm` / `md` / `lg` / `xl` | `4` / `8` / `12` / `20` / `32` | Spacing scale |
-| `size.row.height` | `52` | Session row, comfortable density |
-| `size.icon.status` | `14` | Status icon |
-| `size.dock.icon` | `36` | Dock icon |
-| `size.dock.ring` | `2.5` | Status ring line width |
-| `size.dock.maxIcons` | `6` | Icons before "+N" |
+| `radius.card` | `10` | Welcome panel |
+| `radius.panel` | `8` | Session group panel |
+| `radius.row` | `6` | Disclosure row, row hover inside a panel |
+| `radius.button` | `6` | Buttons |
+| `radius.tag` | `4` | Row tags (`exec`, `experimental`, `stale`) |
+| `radius.popover` | `14` | Reserved: tooltips (v0.2) |
+| `radius.control` | `capsule` | Reserved. The section switcher is a pill shape. |
+| `space.xxs` / `xs` / `sm` / `md` / `lg` / `xl` | `2` / `4` / `8` / `12` / `20` / `32` | Spacing scale |
+| `size.row.height` | `44` | Session row, main window |
+| `size.row.compactHeight` | `40` | Session row, menubar window |
+| `size.content.maxWidth` | `760` | Maximum width of the main window content column |
+| `size.icon.status` | `13` | Status glyph |
+| `size.status.column` | `16` | Width of the status glyph column, so titles align |
+| `size.spinner.line` | `1.5` | Working spinner line width |
+| `size.switcher.height` | `26` | Section switcher height |
+| `size.dock.icon` | `36` | Dock icon (v0.2) |
+| `size.dock.ring` | `2.5` | Status ring line width (v0.2) |
+| `size.dock.maxIcons` | `6` | Icons before "+N" (v0.2) |
 | `size.border` | `1` | Border width |
-| `size.menu.width` | `320` | Menubar window width |
-| `size.window.width` / `size.window.height` | `720` / `480` | Main window minimum size |
-| `size.welcome.width` | `460` | First-run window width. The height fits the content. |
+| `size.menu.width` | `360` | Menubar window width |
+| `size.menu.maxRows` | `5` | Rows in the menubar window before "+N more" |
+| `size.window.width` / `size.window.height` | `560` / `440` | Main window minimum size |
+| `size.window.defaultWidth` / `defaultHeight` | `880` / `640` | Main window size when it first opens |
+| `size.welcome.width` | `480` | First-run window width. The height fits the content. |
+| `size.welcome.scenery` | `120` | Open band under the first-run content, where the scenery shows |
+| `size.welcome.sceneHeight` | `340` | Height of the scenery (ridges, fog) at the bottom of the first-run window |
+| `size.atmosphere.drift` | `28` | Largest fog drift offset, in points |
 
 ### 5.3 Material, font, and motion
 
-| Token | Default | Use |
-|-------|---------|-----|
-| `opacity.card` | `0.72` | Card translucency |
-| `opacity.dock` | `0.80` | Dock translucency |
-| `blur.card` | `24` | Frosted-glass blur on cards |
-| `blur.dock` | `30` | Frosted-glass blur on the dock |
-| `blur.wallpaper` | `40` | Blur for the wallpaper background |
-| `shadow.card.color` | `#1F23281A` | Soft card shadow |
-| `shadow.card.radius` | `16` | Card shadow blur |
-| `shadow.card.y` | `4` | Card shadow offset |
-| `font.family` | `system` | System font (SF Pro) |
-| `font.body.size` / `font.body.weight` | `13` / `regular` | Body text |
-| `font.label.size` / `font.label.weight` | `11` / `medium` | Labels, metadata |
-| `font.title.size` / `font.title.weight` | `17` / `semibold` | Section titles |
-| `font.stat.size` / `font.stat.weight` | `34` / `light` | Big calm numbers. Always monospaced digits. |
-| `motion.duration.fast` | `0.12` | Hover, press |
-| `motion.duration.normal` | `0.22` | Card and row changes |
-| `motion.duration.ring` | `1.6` | One turn of the working ring |
-| `motion.duration.pulse` | `1.2` | One waiting pulse |
+| Token | Light | Dark | Use |
+|-------|-------|------|-----|
+| `opacity.card` | `1.0` | = | Surface opacity. Surfaces are opaque in the MVP. |
+| `opacity.atmosphere.scenery` | `1.0` | `1.0` | Scenery strength on key screens (High Contrast: `0.6`) |
+| `opacity.atmosphere.dense` | `0.55` | `0.7` | Multiplier on dense screens (High Contrast: `0.5`) |
+| `opacity.atmosphere.fog` | `0.7` | `0.7` | Fog band opacity at the band center |
+| `opacity.atmosphere.light` | `0.45` | `0.35` | Warm light strength (High Contrast: `0.2`) |
+| `blur.atmosphere.ridge` | `3` | = | Ridge softness. Far ridges use 2×, middle 1.5×. |
+| `opacity.dock` / `blur.dock` | not set | not set | Reserved: dock material (v0.2) |
+| `blur.wallpaper` | not set | not set | Reserved: wallpaper blur background choice (8) |
+| `shadow.panel.radius` / `shadow.panel.y` | `12` / `2` | = | Soft panel shadow |
+| `font.family` | `system` | = | System font (SF Pro) |
+| `font.body.size` / `.weight` | `13` / `regular` | = | Body text |
+| `font.label.size` / `.weight` | `11` / `regular` | = | Metadata, line 2 of a row |
+| `font.rowTitle.size` / `.weight` | `13` / `medium` | = | Line 1 of a row |
+| `font.section.size` / `.weight` | `11` / `semibold` | = | Group headers |
+| `font.control.size` / `.weight` | `12` / `medium` | = | Switcher, buttons |
+| `font.tag.size` / `.weight` | `10` / `medium` | = | Row tags |
+| `font.title.size` / `.weight` | `17` / `semibold` | = | Window titles |
+| `font.count.size` / `.weight` | `28` / `light` | = | Count line numbers. Always tabular digits. |
+| `font.countCompact.size` / `.weight` | `22` / `light` | = | Count line in the menubar window |
+| `font.stat.size` / `.weight` | `34` / `light` | = | Reserved: large single numbers |
+| `motion.duration.fast` | `0.12` | = | Hover, press |
+| `motion.duration.normal` | `0.22` | = | Fold and unfold a group |
+| `motion.duration.ring` | `1.6` | = | One turn of the working spinner (Core Animation) |
+| `motion.duration.pulse` | `1.2` | = | One waiting pulse (v0.2) |
+| `motion.duration.drift` | `90` | = | One slow fog drift cycle (there and back) |
 
-### 5.4 Status icons
+### 5.4 Icons
 
 | Token | Default SF Symbol |
 |-------|-------------------|
-| `icon.status.working` | `arrow.triangle.2.circlepath` |
+| `icon.status.working` | `arrow.triangle.2.circlepath` (the row draws a spinner instead) |
 | `icon.status.waiting` | `hand.raised.fill` |
 | `icon.status.idle` | `pause.circle` |
 | `icon.status.done` | `checkmark.circle` |
 | `icon.status.unknown` | `questionmark.circle` |
 | `icon.flag.noActivity` | `clock.badge.exclamationmark` |
+| `icon.action.openFolder` | `folder` |
+| `icon.disclosure` | `chevron.right` |
+| `icon.child` | `arrow.turn.down.right` |
 | `icon.app` | `dot.radiowaves.left.and.right` |
 
 ## 6. Status display
@@ -192,13 +297,13 @@ A theme is one JSON file. Keys in `tokens` are flat token names.
   "name": "Fog Light",
   "appearance": "light",
   "tokens": {
-    "color.background.base": "#E6E8EB",
+    "color.background.base": "#E3E5E8",
+    "color.atmosphere.ridgeFar": "#A9B1BC",
     "color.text.primary": "#1F2328",
     "color.accent": "#8FB4D9",
     "color.status.waiting": "#8A5300",
-    "radius.card": 20,
-    "radius.control": "capsule",
-    "opacity.card": 0.72,
+    "radius.panel": 8,
+    "font.count.weight": "light",
     "motion.duration.fast": 0.12
   },
   "densities": {
@@ -211,7 +316,9 @@ A theme is one JSON file. Keys in `tokens` are flat token names.
 ```
 
 - `spyreTheme` is the format version.
-- `appearance` is `light` or `dark`. It sets the macOS window appearance for system controls.
+- `appearance` is `light` or `dark`. It sets the macOS window appearance (title bar, system controls).
+- A string token value is a color, a weight name (`light`, `regular`, `medium`, `semibold`, `bold`),
+  an SF Symbol name, or `capsule`.
 - `densities.compact` overrides tokens in compact density. It is optional. Spyre has a built-in compact overlay.
 
 ### 7.1 Layers
@@ -226,7 +333,8 @@ Spyre builds the active token set in this order. A later layer wins.
 
 ## 8. MVP customization
 
-- Three built-in themes: light, dark, high contrast.
+- Three built-in themes: Fog Light, Fog Dark, High Contrast. Built today: Fog Light and Fog Dark follow the macOS
+  appearance (2.2). The theme setting below is not built yet.
 - Accent color picker. Spyre sets `color.text.onAccent` to the graphite or white value with the higher contrast.
 - Background choice:
   - solid: `color.background.base`,
@@ -251,6 +359,7 @@ Theme import must never crash Spyre and must never use the network.
 3. Ignore unknown token names. Show a warning that lists them. Reason: a newer Spyre version can add tokens.
 4. Check the type of each value. A value with the wrong type is dropped. The default value is used.
 5. Clamp numbers to a safe range. Examples: opacity 0.0 to 1.0, radius 0 to 40, `font.body.size` 10 to 24, motion durations 0 to 2 s.
+   Exception: `motion.duration.drift` 20 to 600 s, and `size.atmosphere.drift` 0 to 64.
 6. Accept colors only in `#RRGGBB` or `#RRGGBBAA` form.
 7. Accept `font.family` only when the font is installed. Otherwise use `system`.
 8. A theme holds no URLs and no file paths. Reject any string value that contains a URL scheme such as `http:`, `https:`, or `file:`.
@@ -263,6 +372,11 @@ Theme import must never crash Spyre and must never use the network.
 
 - Every built-in theme meets WCAG AA: 4.5:1 for body text, 3:1 for large text and for status icons and rings.
 - A test checks every built-in theme.
+- The test checks text and status colors against every surface text sits on: `color.background.base`,
+  `color.surface.card`, `color.surface.row`, `color.surface.rowHover`, `color.surface.waiting`,
+  `color.surface.controlSelected`, the atmosphere tones (`sky`, `horizon`, `fog`), and the translucent
+  `color.surface.control` composed over `color.atmosphere.sky`. It also checks `color.text.onAccent` on `color.accent`.
+- Text never sits on a ridge. Rows and panels are opaque, so the scenery behind them does not change contrast.
 - Check contrast against the card color composed over the background. For wallpaper blur, set `opacity.card` to at least 0.85. The wallpaper color is not known.
 - Imported themes: a theme that fails AA still loads. Spyre shows a warning for each failing text pair. Spyre does not change the colors. The user can switch back to a built-in theme at any time.
 
@@ -271,13 +385,16 @@ Theme import must never crash Spyre and must never use the network.
 When macOS "Reduce Transparency" is on:
 
 - Cards and the dock are opaque: opacity 1.0, blur 0.
+- The translucent switcher track (`color.surface.control`) is drawn as the opaque `color.surface.row`.
 - Wallpaper blur changes to the solid background.
+- The atmosphere stays. It is a background, not a transparent surface.
 
 ### 10.3 Reduce Motion
 
 When macOS "Reduce Motion" is on:
 
-- The working ring does not turn. It shows a static partial arc.
+- The working ring does not turn. It shows a static partial arc. The row spinner is the same.
+- The atmosphere stays, and its drift stops.
 - The waiting pulse is off. The ring stays full and uses a thicker line.
 - Cards, rows, and the dock do not slide or spring. They change with a crossfade of at most `motion.duration.fast`, or at once.
 - Status changes still show at once. Motion never hides a state change.

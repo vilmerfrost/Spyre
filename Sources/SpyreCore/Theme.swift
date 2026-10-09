@@ -36,6 +36,17 @@ public struct RGBA: Sendable, Equatable {
         return 0.2126 * channel(red) + 0.7152 * channel(green) + 0.0722 * channel(blue)
     }
 
+    /// This color drawn over an opaque `background`. The result is opaque.
+    /// Contrast checks use it for translucent tokens (`DESIGN.md` 10.1).
+    public func composited(over background: RGBA) -> RGBA {
+        var result = background
+        result.red = red * alpha + background.red * (1 - alpha)
+        result.green = green * alpha + background.green * (1 - alpha)
+        result.blue = blue * alpha + background.blue * (1 - alpha)
+        result.alpha = 1
+        return result
+    }
+
     /// WCAG contrast ratio between two opaque colors.
     public func contrast(with other: RGBA) -> Double {
         let (light, dark) = luminance > other.luminance ? (self, other) : (other, self)
@@ -81,6 +92,29 @@ public struct Theme: Sendable, Equatable, Decodable {
     }
 
     public static let builtInNames = ["light", "dark", "high-contrast"]
+
+    /// The built-in theme that follows the macOS appearance: Fog Dark for Dark Mode, else Fog Light.
+    /// High Contrast is light only and never chosen automatically. `DESIGN.md` 8.1.
+    public static func builtInName(systemIsDark: Bool) -> String {
+        systemIsDark ? "dark" : "light"
+    }
+
+    /// The hidden launch argument `-SpyreAppearance light|dark`. It forces the appearance that the theme
+    /// follows, for visual checks without a change to the system setting. Read from the launch arguments only.
+    /// Nothing is stored. Returns `true` for dark, `false` for light, and `nil` when the argument is missing or bad.
+    public static func appearanceOverride(arguments: [String]) -> Bool? {
+        guard let index = arguments.firstIndex(of: "-SpyreAppearance"), index + 1 < arguments.count else {
+            return nil
+        }
+        switch arguments[index + 1].lowercased() {
+        case "dark": return true
+        case "light": return false
+        default: return nil
+        }
+    }
+
+    /// `true` when the theme sets the dark macOS window appearance.
+    public var isDark: Bool { appearance == "dark" }
 
     /// Returns this theme with missing tokens filled from `base`. `DESIGN.md` 3, rule 6.
     public func filled(from base: Theme) -> Theme {
