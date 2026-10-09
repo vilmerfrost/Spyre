@@ -24,6 +24,7 @@ struct WelcomePresenterTests {
     private func launch() -> WelcomePresenter {
         let presenter = WelcomePresenter(file: file)
         presenter.configLoaded(file.load().config)
+        presenter.appLaunched()
         return presenter
     }
 
@@ -113,5 +114,32 @@ struct WelcomePresenterTests {
         presenter.configLoaded(SpyreConfig(welcomeSeen: true))
         presenter.configLoaded(SpyreConfig(welcomeSeen: false))
         #expect(!presenter.isPresented)
+    }
+
+    @Test func windowWaitsForLaunchToFinish() {
+        let presenter = WelcomePresenter(file: file)
+        presenter.configLoaded(SpyreConfig(welcomeSeen: false))
+        #expect(presenter.isPresented)
+        #expect(!presenter.showsWindow)
+        presenter.appLaunched()
+        #expect(presenter.showsWindow)
+    }
+
+    @Test func reopenBringsWelcomeBackUntilItIsAnswered() async throws {
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let presenter = launch()
+        #expect(presenter.reopenTarget == .welcome)
+        try await presenter.startWatching()
+        #expect(presenter.reopenTarget == .mainWindow)
+        #expect(!presenter.showsWindow)
+    }
+
+    @Test func reopenOpensMainWindowAfterCloseOrWhenSeen() throws {
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let presenter = launch()
+        presenter.closed()
+        #expect(presenter.reopenTarget == .mainWindow)
+        try write(#"{"welcomeSeen":true}"#)
+        #expect(launch().reopenTarget == .mainWindow)
     }
 }

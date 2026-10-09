@@ -35,6 +35,9 @@ public struct ConfigFile: Sendable {
     public static let fileName = "config.json"
     /// The `true`/`false` key for the first-run screen. `SPEC.md` 4.8.
     public static let welcomeSeenKey = "welcomeSeen"
+    static let hotkeyKey = "hotkey"
+    static let showDockIconKey = "showDockIcon"
+    static let otherKeys: Set<String> = [welcomeSeenKey, hotkeyKey, showDockIconKey]
 
     /// Valid range per key, in seconds. A value outside the range is clamped.
     static let ranges: [String: ClosedRange<Double>] = [
@@ -83,7 +86,7 @@ public struct ConfigFile: Sendable {
         }
         var config = SpyreConfig.default
         var warnings: [String] = []
-        for key in root.keys.sorted() where ranges[key] == nil && key != welcomeSeenKey {
+        for key in root.keys.sorted() where ranges[key] == nil && !otherKeys.contains(key) {
             warnings.append("Unknown key \"\(key)\" in config.json is ignored.")
         }
         for (key, range) in ranges.sorted(by: { $0.key < $1.key }) {
@@ -98,19 +101,33 @@ public struct ConfigFile: Sendable {
             }
             config[key] = value
         }
-        if let raw = root[welcomeSeenKey] {
-            if let flag = raw as? NSNumber, CFGetTypeID(flag) == CFBooleanGetTypeID() {
-                config.welcomeSeen = flag.boolValue
+        config.welcomeSeen = bool(root, welcomeSeenKey, &warnings) ?? config.welcomeSeen
+        config.showDockIcon = bool(root, showDockIconKey, &warnings) ?? config.showDockIcon
+        if let raw = root[hotkeyKey] {
+            if let text = raw as? String, let hotkey = Hotkey(text) {
+                config.hotkey = hotkey
             } else {
-                warnings.append("\"\(welcomeSeenKey)\" must be true or false. Using the default.")
+                warnings.append(#""hotkey" must be like "ctrl+opt+s". Using the default."#)
             }
         }
         return ConfigLoadResult(config: config, warnings: warnings)
     }
 
+    /// A `true`/`false` value, or `nil` with a warning for a wrong type.
+    private static func bool(_ root: [String: Any], _ key: String, _ warnings: inout [String]) -> Bool? {
+        guard let raw = root[key] else { return nil }
+        guard let flag = raw as? NSNumber, CFGetTypeID(flag) == CFBooleanGetTypeID() else {
+            warnings.append("\"\(key)\" must be true or false. Using the default.")
+            return nil
+        }
+        return flag.boolValue
+    }
+
     static func encode(_ config: SpyreConfig) throws -> Data {
         var object = ranges.keys.reduce(into: [String: Any]()) { $0[$1] = config[$1] }
         object[welcomeSeenKey] = config.welcomeSeen
+        object[hotkeyKey] = config.hotkey.configString
+        object[showDockIconKey] = config.showDockIcon
         return try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys])
     }
 

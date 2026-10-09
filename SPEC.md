@@ -45,9 +45,22 @@ It never starts, stops, or changes an agent session.
 | Menubar item | Spyre icon, a badge, and a short session list. | Yes |
 | Main window | A section switcher: Radar, Grab, Lab. Grab and Lab show "Coming soon". | Yes |
 | Welcome window | The first-run screen (4.8). | Yes |
+| macOS Dock icon | Not the dock strip above. Off by default. `showDockIcon` (4.4) turns it on. A click opens the main window. | Yes |
 | Dock | A vertical strip on one screen edge. One icon per live session. | No. Planned for v0.2. Default: hidden. |
 
 `DESIGN.md` defines the look of all surfaces.
+
+**Reach Spyre without the menubar icon.** The menubar can hide the icon (the notch, a full menubar).
+These paths open the main window and bring it to the front:
+
+- Open the app again while it runs: Finder, Raycast, `open`, or the Dock icon.
+  Spyre handles the reopen event (`applicationShouldHandleReopen`).
+  While the first-run screen is open, reopen brings that screen to the front instead.
+- The global shortcut `hotkey` (4.4). Default: Control-Option-S (⌃⌥S).
+- "Open Spyre" in the menubar window.
+
+The main window and the welcome window are AppKit windows (`NSWindow` with a SwiftUI view), not SwiftUI scenes.
+AppKit code (reopen, the shortcut) cannot open a SwiftUI `Window` scene reliably in a menubar-only app.
 
 ## 4. Radar MVP features
 
@@ -156,13 +169,15 @@ Spyre reads the values from `~/Library/Application Support/Spyre/config.json`.
   "adapterRefreshTimeout" : 2,
   "alertDelay" : 3,
   "doneRowTimeout" : 600,
+  "hotkey" : "ctrl+opt+s",
   "noActivityThreshold" : 600,
+  "showDockIcon" : false,
   "welcomeSeen" : false
 }
 ```
 
-- The file is one JSON object. Every value is a number of seconds, except `welcomeSeen` (`true` or `false`).
-  Every key is optional.
+- The file is one JSON object. Every value is a number of seconds, except `welcomeSeen` and `showDockIcon`
+  (`true` or `false`) and `hotkey` (a string). Every key is optional.
 - On launch, Spyre creates the file with the defaults if it does not exist.
 - Spyre reloads the file when it changes. This includes an editor that saves by replacing the file.
 - Spyre never crashes on a bad file. Each problem gives a warning, and the menubar window shows the first warning.
@@ -181,6 +196,22 @@ Spyre reads the values from `~/Library/Application Support/Spyre/config.json`.
 | `noActivityThreshold` | 60 – 86400 |
 | `adapterRefreshTimeout` | 0.5 – 60 |
 | `doneRowTimeout` | 0 – 86400 |
+
+| Key | Default | Meaning |
+|-----|---------|---------|
+| `welcomeSeen` | `false` | The first-run screen was accepted (4.8). |
+| `showDockIcon` | `false` | `true` shows Spyre in the Dock (activation policy `.regular`). `false`: menubar only (`.accessory`). Applied at launch and on each reload. |
+| `hotkey` | `"ctrl+opt+s"` | The global shortcut that opens the main window. |
+
+`hotkey` grammar: modifiers and one key, joined by `+`, for example `"cmd+shift+k"`. Case does not matter.
+Modifiers: `ctrl`, `opt`, `shift`, `cmd`, each at most once. At least one of `ctrl`, `opt`, `cmd`.
+Key: one letter `a`–`z` or one digit `0`–`9`, by its US key position.
+A value that does not follow the grammar gives the default and a warning.
+
+Spyre registers the shortcut with Carbon `RegisterEventHotKey`. It needs no Accessibility permission.
+Spyre registers it again when the value changes. When macOS refuses the shortcut, Spyre logs a warning
+(category `config`), shows it as a config warning, and keeps running.
+Limit: macOS does not report a shortcut that another app also registered. Both apps then get it, or only one.
 
 Spyre writes to the file in one case only: "Start watching" on the first-run screen (4.8).
 It reads the file, sets `welcomeSeen` to `true`, and keeps every other key, unknown keys too.
@@ -283,8 +314,24 @@ Section 6 defines adapters and source readers.
 - Closing the window without the button does not count as seen. The window shows again on the next launch.
   Reason: Spyre writes its config only after an explicit user action.
 - The menubar window has a "Show welcome screen" item. It opens the window at any time. It does not change `welcomeSeen`.
-- The window is an AppKit window, not a SwiftUI scene. On macOS 14 a menubar-only (`LSUIElement`) app
-  has no SwiftUI hook that opens a scene at launch. Spyre activates itself, so the window comes to the front.
+- "Start watching" has no keyboard shortcut. Only a click (or VoiceOver) accepts the screen.
+  A stray Return or Escape does nothing.
+- The window tells the user the shortcut (in symbols, for example ⌃⌥S) and that opening the app again shows Spyre.
+- The window opens after `applicationDidFinishLaunching`. Spyre asks macOS to activate it (`NSApp.activate()`).
+  macOS 14 can refuse this when another app is frontmost. So the window also opens in front of all apps
+  (`orderFrontRegardless`, floating level, on every Space and over full-screen apps).
+  It becomes a normal window when it becomes key. It stays open until "Start watching" or the close button.
+
+**Root cause of the v0.1 first-run bug.** Confirmed with the unified log and a local reproduction.
+Spyre was launched with `open` from a terminal. macOS refused the activation (`NSApp.activate()` is a request).
+The terminal stayed frontmost, and WindowServer marked the welcome window "occluded", so the user did not see it.
+Opening Spyre from Raycast then showed nothing. A second `open` from the terminal activated Spyre (`SETFRONT`),
+and the window became "visible".
+1.6 s later a mouse click hit "Start watching" (`trackMouse send action on mouseUp`). No key event went to
+Spyre. Spyre wrote `welcomeSeen: true` and closed the window. Opening Spyre again showed nothing,
+because Spyre did not handle reopen, and the menubar icon was hidden.
+Fixes: the window shows in front without activation; reopen and the shortcut open Spyre; no Return default.
+A Return accepted the old window in the reproduction, so the Return guard stays.
 
 ## 5. Data sources
 

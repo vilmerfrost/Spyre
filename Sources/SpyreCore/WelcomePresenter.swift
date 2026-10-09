@@ -5,7 +5,13 @@ import Foundation
 public final class WelcomePresenter {
     /// `true` while the first-run screen should be on screen.
     public private(set) var isPresented = false
+    /// `true` when the window may be on screen: the screen is presented and the app finished launching.
+    /// A window shown before launch ends cannot come to the front.
+    public var showsWindow: Bool { isPresented && launched }
+    /// What opening Spyre again (Finder, Raycast, `open`, Dock, the shortcut) brings to the front.
+    public var reopenTarget: ReopenTarget { isPresented ? .welcome : .mainWindow }
     private var decided = false
+    private var launched = false
     private let file: ConfigFile
 
     public init(file: ConfigFile) {
@@ -17,6 +23,11 @@ public final class WelcomePresenter {
         guard !decided else { return }
         decided = true
         isPresented = !config.welcomeSeen
+    }
+
+    /// Call once, when `applicationDidFinishLaunching` runs.
+    public func appLaunched() {
+        launched = true
     }
 
     /// The "Show welcome screen" menu item. It does not change `welcomeSeen`.
@@ -35,4 +46,11 @@ public final class WelcomePresenter {
         let file = file
         try await Task.detached { try file.markWelcomeSeen() }.value
     }
+}
+
+/// The window that opening Spyre again brings to the front. `SPEC.md` 3.2.
+public enum ReopenTarget: Sendable, Equatable {
+    /// The first-run screen is still open. It stays first until the user answers it.
+    case welcome
+    case mainWindow
 }

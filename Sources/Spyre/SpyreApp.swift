@@ -1,12 +1,14 @@
+import AppKit
 import os
 import SpyreCore
 import SwiftUI
 
 @main
 struct SpyreApp: App {
-    @State private var model = AppModel()
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
 
     var body: some Scene {
+        let model = delegate.model
         MenuBarExtra {
             MenuContentView()
                 .environment(model)
@@ -15,12 +17,22 @@ struct SpyreApp: App {
             MenuBarLabel(waitingCount: model.sessions.waitingCount, icon: model.tokens.icon("icon.app"))
         }
         .menuBarExtraStyle(.window)
+    }
+}
 
-        Window("Spyre", id: "main") {
-            MainWindowView()
-                .environment(model)
-                .environment(\.tokens, model.tokens)
-        }
+/// Owns the app state, so AppKit events (launch, reopen) reach it.
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    let model = AppModel()
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        model.launchFinished()
+    }
+
+    /// Opening Spyre again while it runs: Finder, Raycast, `open`, or a click on the Dock icon.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        model.reopen()
+        return false
     }
 }
 
@@ -35,7 +47,13 @@ final class AppModel {
     var tokens = Tokens.builtIn("light")
     /// Decides when the first-run screen shows. `SPEC.md` 4.8.
     private let welcome: WelcomePresenter
-    private let welcomeWindow = WelcomeWindowController()
+    private let welcomeWindow = HostedWindowController(title: "Welcome to Spyre", style: [.titled, .closable])
+    private let mainWindow = HostedWindowController(
+        title: "Spyre", style: [.titled, .closable, .miniaturizable, .resizable]
+    )
+    private var hotkey: GlobalHotkey?
+    /// A problem with the global shortcut. Shown with the config warnings.
+    private var hotkeyWarning: String?
     private let makeAdapters: @Sendable (SpyreConfig) -> [any AgentAdapter]
     private var store: SessionStore?
     private var configWatcher: ConfigWatcher?
@@ -48,6 +66,7 @@ final class AppModel {
     ) {
         self.makeAdapters = makeAdapters
         welcome = WelcomePresenter(file: configFile)
+        hotkey = GlobalHotkey { [weak self] in self?.showMainWindow() }
         configWatcher = ConfigWatcher(file: configFile) { [weak self] result in
             Task { @MainActor in self?.apply(result) }
         }
@@ -65,8 +84,11 @@ final class AppModel {
 
     private func apply(_ result: ConfigLoadResult) {
         config = result.config
-        configWarnings = result.warnings
-        for warning in result.warnings {
+        let policy: NSApplication.ActivationPolicy = result.config.showDockIcon ? .regular : .accessory
+        if NSApp.activationPolicy() != policy { NSApp.setActivationPolicy(policy) }
+        hotkeyWarning = hotkey?.register(result.config.hotkey)
+        configWarnings = result.warnings + [hotkeyWarning].compactMap { $0 }
+        for warning in configWarnings {
             Self.logger.warning("\(warning, privacy: .public)")
         }
         if let store {
@@ -75,6 +97,26 @@ final class AppModel {
             start(SessionStore(adapters: makeAdapters(result.config), config: result.config))
             welcome.configLoaded(result.config)
             syncWelcomeWindow()
+        }
+    }
+
+    func launchFinished() {
+        welcome.appLaunched()
+        syncWelcomeWindow()
+    }
+
+    /// Opening the app again brings the first-run window back while it is open, else the main window.
+    func reopen() {
+        switch welcome.reopenTarget {
+        case .welcome: syncWelcomeWindow()
+        case .mainWindow: showMainWindow()
+        }
+    }
+
+    /// The "Open Spyre" button, the global shortcut, and reopen.
+    func showMainWindow() {
+        mainWindow.show {
+            MainWindowView().environment(self).environment(\.tokens, tokens)
         }
     }
 
@@ -96,12 +138,14 @@ final class AppModel {
     }
 
     private func syncWelcomeWindow() {
-        guard welcome.isPresented else { return welcomeWindow.close() }
-        welcomeWindow.show(
-            tokens: tokens,
-            onStart: { [weak self] in self?.startWatching() },
-            onClose: { [weak self] in self?.welcome.closed() }
-        )
+        guard welcome.showsWindow else { return welcomeWindow.close() }
+        let shortcut = config.hotkey.displayString
+        welcomeWindow.show(pinned: true) {
+            WelcomeView(shortcut: shortcut, onStart: { [weak self] in self?.startWatching() })
+                .environment(\.tokens, tokens)
+        } onClose: { [weak self] in
+            self?.welcome.closed()
+        }
     }
 
     private func start(_ store: SessionStore) {
