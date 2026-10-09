@@ -116,10 +116,37 @@ extension Array where Element == SessionRecord {
     /// The number shown in the menubar badge.
     public var waitingCount: Int { filter { $0.status.countsInBadge }.count }
 
-    /// Sessions grouped by status. Inside a group, the newest activity comes first.
-    public func grouped() -> [(group: StatusGroup, sessions: [SessionRecord])] {
-        Dictionary(grouping: self) { $0.status.group }
+    /// The session list in display order. `SPEC.md` 4.2.
+    ///
+    /// Top-level rows are grouped by status. Inside a group, the newest activity comes first.
+    /// A child session whose parent is in the list shows directly under its parent, in the parent's group,
+    /// newest first. A child whose parent is not in the list is a top-level row in its own group.
+    public func grouped() -> [(group: StatusGroup, rows: [SessionListRow])] {
+        let ids = Set(map(\.id))
+        let newestFirst = sorted { $0.lastActivity > $1.lastActivity }
+        let nested = newestFirst.filter { record in
+            record.isChildSession && record.parentID.map { ids.contains($0) && $0 != record.id } == true
+        }
+        let nestedIDs = Set(nested.map(\.id))
+        let children = Dictionary(grouping: nested) { $0.parentID ?? "" }
+        let topLevel = newestFirst.filter { !nestedIDs.contains($0.id) }
+        return Dictionary(grouping: topLevel) { $0.status.group }
             .sorted { $0.key < $1.key }
-            .map { ($0.key, $0.value.sorted { $0.lastActivity > $1.lastActivity }) }
+            .map { group, records in
+                let rows = records.flatMap { parent in
+                    [SessionListRow(session: parent, isNested: false)]
+                        + (children[parent.id] ?? []).map { SessionListRow(session: $0, isNested: true) }
+                }
+                return (group, rows)
+            }
     }
+}
+
+/// One row in the session list.
+public struct SessionListRow: Sendable, Identifiable, Equatable {
+    public var session: SessionRecord
+    /// `true` for a child session shown under its parent row.
+    public var isNested: Bool
+
+    public var id: String { session.id }
 }

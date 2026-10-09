@@ -1,7 +1,7 @@
 import SpyreCore
 import SwiftUI
 
-/// Sessions grouped by status, each group with a header. `SPEC.md` 4.2.
+/// Sessions grouped by status, each group with a header. Child rows sit under their parent, indented. `SPEC.md` 4.2.
 struct SessionListView: View {
     let sessions: [SessionRecord]
     @Environment(\.tokens) private var tokens
@@ -12,7 +12,10 @@ struct SessionListView: View {
                 Text(entry.group.title)
                     .font(tokens.font("label"))
                     .foregroundStyle(tokens.color("color.text.secondary"))
-                ForEach(entry.sessions) { SessionRow(session: $0) }
+                ForEach(entry.rows) { row in
+                    SessionRow(session: row.session)
+                        .padding(.leading, row.isNested ? tokens.value("space.lg") : 0)
+                }
             }
         }
     }
