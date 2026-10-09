@@ -1,0 +1,4 @@
+{"type":"user","timestamp":"2027-01-15T08:04:00.000Z","sessionId":"00000000-0000-0000-0000-0000000000c2","cwd":"/Users/you/Projects/docs","gitBranch":"docs/readme","message":{"role":"user","content":"fake prompt"}}
+{"type":"assistant","timestamp":"2027-01-15T08:04:30.000Z","sessionId":"00000000-0000-0000-0000-0000000000c2","cwd":"/Users/you/Projects/docs","gitBranch":"docs/readme","message":{"role":"assistant","stop_reason":"end_turn","content":[{"type":"text","text":"fake"}]}}
+{"type":"attachment","timestamp":"2027-01-15T08:04:31.000Z","sessionId":"00000000-0000-0000-0000-0000000000c2","cwd":"/Users/you/Projects/docs","gitBranch":"docs/readme"}
+{"type":"system","subtype":"stop_hook_summary","timestamp":"2027-01-15T08:04:32.000Z","sessionId":"00000000-0000-0000-0000-0000000000c2","cwd":"/Users/you/Projects/docs","gitBranch":"docs/readme"}

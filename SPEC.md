@@ -191,6 +191,8 @@ The registry reader must tolerate these gaps:
 - On a bad read, keep the last known state for that session. Retry on the next file event, or after 250 ms, whichever comes first.
 - A new session with no good read yet does not show a status. Show the row with the label "Starting…". If there is still no good read after `adapterRefreshTimeout`, show `unknown`.
 - Never show a state that no source reported.
+- A file that parses but has no `status` still gives `cwd` and `sessionId` for the "Starting…" row. Before the first parse, the row ID is `claude-pid-<pid>`. After it, the row ID is the `sessionId`.
+- A dead PID or a deleted file gives `done`. A dead file Spyre sees for the first time counts as done since its `updatedAt`, so old leftover files never show.
 
 **Merge rule.**
 When both sources have a state for the same session, the hook wins.
@@ -213,6 +215,8 @@ The user pastes it.
 
 ### 4.6 Child sessions
 
+**EXPERIMENTAL.** The first implementation (`ClaudeCodeAdapter`) has not been verified against a real child session yet.
+
 A Claude Code session started from inside another Claude Code session has `CLAUDE_CODE_CHILD_SESSION` set.
 It writes no registry file (verified).
 
@@ -224,12 +228,18 @@ Spyre finds child sessions this way:
 4. Spyre walks the parent process chain (parent PID, then its parent PID). The first process that has a registry file is the parent session.
 5. Spyre shows the child row under the parent row, with the label "child session".
 6. When no parent is found, Spyre shows the child as its own top-level row, with the label "child, no parent".
+7. A candidate whose working directory is readable but has no unclaimed transcript is not shown. Desktop-app Claude processes with no registry file and no transcript were observed. They are not sessions.
+
+The record has `isChildSession = true`. Its ID is `claude-child-<pid>`.
 
 Status of a child session:
 
 - The registry has no status for it.
 - When the `PermissionRequest` hook is installed and fires for the child, the hook gives `waiting`.
 - Otherwise the transcript tail gives the status: a record newer than the last turn end gives `working`, a turn end gives `idle`. The first code PR for child sessions must verify this method.
+  - Turn end: an `assistant` record with `message.stop_reason: "end_turn"`, or a `system` record with `subtype` `turn_duration` or `stop_hook_summary`. Spyre reads `stop_reason` only, never message content.
+  - Newer activity: a `user` record, or an `assistant` record with any other `stop_reason`. Other record types are ignored.
+  - Known limit: a child waiting on a permission prompt shows `working` without the hook.
 - The process ending gives `done`.
 - Spyre shows `unknown` only when the child's data cannot be read.
 
@@ -265,6 +275,8 @@ All example values below are fake.
 - Next to it: `<pid>.<hash>.key`. Spyre must never read `.key` files.
 - A clean exit (`/exit`) deletes both files (verified).
 - A killed process leaves the files behind (verified: 4 of 9 files had dead PIDs). Spyre must check that the PID is alive. Compare `procStart` to the real process start time to detect PID reuse.
+  - `startedAt` matched the real start time within 1 s (verified). Spyre uses it first. A process that started more than 5 s after it has a reused PID.
+  - `procStart` is in UTC in 2.1.293 (verified). Older versions (2.1.268 to 2.1.291) wrote a number with unknown meaning. Spyre uses `procStart` only when `startedAt` is missing.
 
 Fields:
 
@@ -347,7 +359,7 @@ A `PermissionRequest` hook from another tool can answer a prompt in about 2 s (v
 **C. Transcript (secondary)**
 
 - Path: `~/.claude/projects/<encoded-cwd>/<sessionId>.jsonl` (verified).
-- `<encoded-cwd>` is the `cwd` with each `/` replaced by `-`. Example: `-Users-you-Projects-app`.
+- `<encoded-cwd>` is the `cwd` with each `/` replaced by `-`. Example: `-Users-you-Projects-app`. A `.` also becomes `-` (verified). Spyre replaces each character that is not a letter, digit, or `-` (inferred for other characters).
 - Format: JSON Lines. The file only grows.
 - Useful fields on `user`, `assistant`, and `system` records: `timestamp`, `cwd`, `gitBranch`, `sessionId`.
 - Use: git branch, a fallback for last activity, and child session discovery (4.6).
