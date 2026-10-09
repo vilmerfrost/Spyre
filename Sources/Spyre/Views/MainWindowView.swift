@@ -44,6 +44,9 @@ struct MainWindowView: View {
                 .hidden()
                 .accessibilityHidden(true)
         }
+        // macOS gives the first stop focus when the window opens. The ring is for keyboard focus only, so the
+        // window opens with no focus; Tab then reaches the switcher.
+        .task { focus = nil }
         .onChange(of: headerHeight + sectionHeight, initial: true) { _, height in
             model.mainContentHeightChanged(height + tokens.value("space.lg"))
         }
