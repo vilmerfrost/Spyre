@@ -14,7 +14,7 @@ Spyre has no fixed brand look. The user owns the look.
 
 ## 2. Default theme direction
 
-The default themes follow the Vilmer design system v1.1. Its "Atmosphere and Light" section wins conflicts.
+The default themes follow the rules below. When two rules conflict, atmosphere and light win: the app rests on a calm, layered fog, never on a flat white page.
 In short: a precise, calm tool that floats over quiet fog and distant mountains.
 
 - The window content rests on an atmospheric background (2.1). The background is never one flat color.
