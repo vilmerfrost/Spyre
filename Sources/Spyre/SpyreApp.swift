@@ -33,6 +33,9 @@ final class AppModel {
     /// Problems in `config.json`. The menubar window shows them.
     private(set) var configWarnings: [String] = []
     var tokens = Tokens.builtIn("light")
+    /// Decides when the first-run screen shows. `SPEC.md` 4.8.
+    private let welcome: WelcomePresenter
+    private let welcomeWindow = WelcomeWindowController()
     private let makeAdapters: @Sendable (SpyreConfig) -> [any AgentAdapter]
     private var store: SessionStore?
     private var configWatcher: ConfigWatcher?
@@ -44,6 +47,7 @@ final class AppModel {
         configFile: ConfigFile = ConfigFile(folder: ConfigFile.defaultFolder())
     ) {
         self.makeAdapters = makeAdapters
+        welcome = WelcomePresenter(file: configFile)
         configWatcher = ConfigWatcher(file: configFile) { [weak self] result in
             Task { @MainActor in self?.apply(result) }
         }
@@ -69,7 +73,35 @@ final class AppModel {
             Task { await store.update(config: result.config) }
         } else {
             start(SessionStore(adapters: makeAdapters(result.config), config: result.config))
+            welcome.configLoaded(result.config)
+            syncWelcomeWindow()
         }
+    }
+
+    /// The "Show welcome screen" menu item. It does not reset `welcomeSeen`.
+    func showWelcome() {
+        welcome.reopen()
+        syncWelcomeWindow()
+    }
+
+    private func startWatching() {
+        Task {
+            do {
+                try await welcome.startWatching()
+            } catch {
+                Self.logger.warning("Cannot write welcomeSeen to config.json.")
+            }
+        }
+        welcomeWindow.close()
+    }
+
+    private func syncWelcomeWindow() {
+        guard welcome.isPresented else { return welcomeWindow.close() }
+        welcomeWindow.show(
+            tokens: tokens,
+            onStart: { [weak self] in self?.startWatching() },
+            onClose: { [weak self] in self?.welcome.closed() }
+        )
     }
 
     private func start(_ store: SessionStore) {

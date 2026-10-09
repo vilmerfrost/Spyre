@@ -44,6 +44,7 @@ It never starts, stops, or changes an agent session.
 |---------|---------|--------|
 | Menubar item | Spyre icon, a badge, and a short session list. | Yes |
 | Main window | A section switcher: Radar, Grab, Lab. Grab and Lab show "Coming soon". | Yes |
+| Welcome window | The first-run screen (4.8). | Yes |
 | Dock | A vertical strip on one screen edge. One icon per live session. | No. Planned for v0.2. Default: hidden. |
 
 `DESIGN.md` defines the look of all surfaces.
@@ -143,6 +144,7 @@ Spyre stores these values in its config, not in code:
 | `noActivityThreshold` | 10 min | No-activity flag (4.4) |
 | `adapterRefreshTimeout` | 2 s | Stale mark (4.4, 6.4) |
 | `doneRowTimeout` | 10 min | Hiding `done` rows (4.4) |
+| `welcomeSeen` | `false` | First-run screen (4.8) |
 
 The MVP has no settings UI for these values.
 
@@ -154,11 +156,13 @@ Spyre reads the values from `~/Library/Application Support/Spyre/config.json`.
   "adapterRefreshTimeout" : 2,
   "alertDelay" : 3,
   "doneRowTimeout" : 600,
-  "noActivityThreshold" : 600
+  "noActivityThreshold" : 600,
+  "welcomeSeen" : false
 }
 ```
 
-- The file is one JSON object. Every value is a number of seconds. Every key is optional.
+- The file is one JSON object. Every value is a number of seconds, except `welcomeSeen` (`true` or `false`).
+  Every key is optional.
 - On launch, Spyre creates the file with the defaults if it does not exist.
 - Spyre reloads the file when it changes. This includes an editor that saves by replacing the file.
 - Spyre never crashes on a bad file. Each problem gives a warning, and the menubar window shows the first warning.
@@ -177,6 +181,10 @@ Spyre reads the values from `~/Library/Application Support/Spyre/config.json`.
 | `noActivityThreshold` | 60 – 86400 |
 | `adapterRefreshTimeout` | 0.5 – 60 |
 | `doneRowTimeout` | 0 – 86400 |
+
+Spyre writes to the file in one case only: "Start watching" on the first-run screen (4.8).
+It reads the file, sets `welcomeSeen` to `true`, and keeps every other key, unknown keys too.
+The write is atomic. Spyre does not replace a file that is not a JSON object.
 
 ### 4.5 Status sources
 
@@ -265,6 +273,18 @@ Spyre never reads the environment variables of another process. They can hold se
 ### 4.7 Adapters
 
 Section 6 defines adapters and source readers.
+
+### 4.8 First-run screen
+
+- On launch, Spyre shows a welcome window when `welcomeSeen` (4.4) is `false` or missing.
+- Only the first config load decides. A later reload never opens the window.
+- The window tells the user what Spyre does, what it reads (5.1, 5.2), the privacy rules (10), and the read-only rule.
+- It has one button: "Start watching". The button closes the window and sets `welcomeSeen` to `true`.
+- Closing the window without the button does not count as seen. The window shows again on the next launch.
+  Reason: Spyre writes its config only after an explicit user action.
+- The menubar window has a "Show welcome screen" item. It opens the window at any time. It does not change `welcomeSeen`.
+- The window is an AppKit window, not a SwiftUI scene. On macOS 14 a menubar-only (`LSUIElement`) app
+  has no SwiftUI hook that opens a scene at launch. Spyre activates itself, so the window comes to the front.
 
 ## 5. Data sources
 

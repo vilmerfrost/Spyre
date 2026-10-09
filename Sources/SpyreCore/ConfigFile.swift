@@ -33,6 +33,8 @@ public struct ConfigLoadResult: Sendable, Equatable {
 /// Reads `config.json` from Spyre's own folder. See `SPEC.md` 4.4 for the format.
 public struct ConfigFile: Sendable {
     public static let fileName = "config.json"
+    /// The `true`/`false` key for the first-run screen. `SPEC.md` 4.8.
+    public static let welcomeSeenKey = "welcomeSeen"
 
     /// Valid range per key, in seconds. A value outside the range is clamped.
     static let ranges: [String: ClosedRange<Double>] = [
@@ -81,7 +83,7 @@ public struct ConfigFile: Sendable {
         }
         var config = SpyreConfig.default
         var warnings: [String] = []
-        for key in root.keys.sorted() where ranges[key] == nil {
+        for key in root.keys.sorted() where ranges[key] == nil && key != welcomeSeenKey {
             warnings.append("Unknown key \"\(key)\" in config.json is ignored.")
         }
         for (key, range) in ranges.sorted(by: { $0.key < $1.key }) {
@@ -96,13 +98,43 @@ public struct ConfigFile: Sendable {
             }
             config[key] = value
         }
+        if let raw = root[welcomeSeenKey] {
+            if let flag = raw as? NSNumber, CFGetTypeID(flag) == CFBooleanGetTypeID() {
+                config.welcomeSeen = flag.boolValue
+            } else {
+                warnings.append("\"\(welcomeSeenKey)\" must be true or false. Using the default.")
+            }
+        }
         return ConfigLoadResult(config: config, warnings: warnings)
     }
 
     static func encode(_ config: SpyreConfig) throws -> Data {
-        let object = ranges.keys.reduce(into: [String: Double]()) { $0[$1] = config[$1] }
+        var object = ranges.keys.reduce(into: [String: Any]()) { $0[$1] = config[$1] }
+        object[welcomeSeenKey] = config.welcomeSeen
         return try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys])
     }
+
+    /// Sets `welcomeSeen` to `true`. It reads the file first and keeps every other key, unknown keys too.
+    /// A file that is not a JSON object is not overwritten. The write is atomic.
+    public func markWelcomeSeen() throws {
+        var root: [String: Any] = [:]
+        if let data = fileSystem.contents(of: url) {
+            guard let object = try? JSONSerialization.jsonObject(with: data), let existing = object as? [String: Any]
+            else { throw ConfigWriteError.notAnObject }
+            root = existing
+        } else {
+            try fileSystem.createFolder(at: folder)
+        }
+        root[Self.welcomeSeenKey] = true
+        let data = try JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys])
+        try fileSystem.write(data, to: url)
+    }
+}
+
+/// Why Spyre did not write `config.json`.
+public enum ConfigWriteError: Error, Equatable {
+    /// The file is not a JSON object. Spyre does not replace a file the user must fix.
+    case notAnObject
 }
 
 extension SpyreConfig {
