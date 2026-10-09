@@ -28,12 +28,24 @@ struct SpyreApp: App {
 @Observable
 final class AppModel {
     private(set) var sessions: [SessionRecord] = []
+    private(set) var config = SpyreConfig.default
+    /// Problems in `config.json`. The menubar window shows them.
+    private(set) var configWarnings: [String] = []
     var tokens = Tokens.builtIn("light")
     private let adapter: any AgentAdapter
+    private var configWatcher: ConfigWatcher?
 
-    init(adapter: any AgentAdapter) {
+    init(adapter: any AgentAdapter, configFile: ConfigFile = ConfigFile(folder: ConfigFile.defaultFolder())) {
         self.adapter = adapter
+        configWatcher = ConfigWatcher(file: configFile) { [weak self] result in
+            Task { @MainActor in self?.apply(result) }
+        }
         Task { await refresh() }
+    }
+
+    private func apply(_ result: ConfigLoadResult) {
+        config = result.config
+        configWarnings = result.warnings
     }
 
     func refresh() async {

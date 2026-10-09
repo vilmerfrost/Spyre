@@ -29,6 +29,11 @@ struct MenuContentView: View {
                 .font(tokens.font("stat").weight(.light).monospacedDigit())
                 .foregroundStyle(tokens.color("color.text.primary"))
             SessionListView(sessions: model.sessions)
+            if let warning = model.configWarnings.first {
+                Label(warning, systemImage: tokens.icon("icon.status.waiting"))
+                    .font(tokens.font("label"))
+                    .foregroundStyle(tokens.color("color.text.secondary"))
+            }
             Button("Open Spyre") { openWindow(id: "main") }
                 .buttonStyle(.borderedProminent)
                 .tint(tokens.color("color.accent"))

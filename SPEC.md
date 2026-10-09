@@ -139,6 +139,35 @@ Spyre stores these values in its config, not in code:
 
 The MVP has no settings UI for these values.
 
+**Config file.**
+Spyre reads the values from `~/Library/Application Support/Spyre/config.json`.
+
+```json
+{
+  "adapterRefreshTimeout" : 2,
+  "alertDelay" : 3,
+  "noActivityThreshold" : 600
+}
+```
+
+- The file is one JSON object. Every value is a number of seconds. Every key is optional.
+- On launch, Spyre creates the file with the defaults if it does not exist.
+- Spyre reloads the file when it changes. This includes an editor that saves by replacing the file.
+- Spyre never crashes on a bad file. Each problem gives a warning, and the menubar window shows the first warning.
+
+| Problem | Result |
+|---------|--------|
+| Not valid JSON, or not an object | All defaults |
+| Unknown key | Ignored |
+| Wrong type (string, bool, null, …) | The default for that key |
+| Value out of range | Clamped to the range |
+
+| Key | Range (s) |
+|-----|-----------|
+| `alertDelay` | 0 – 300 |
+| `noActivityThreshold` | 60 – 86400 |
+| `adapterRefreshTimeout` | 0.5 – 60 |
+
 ### 4.5 Status sources
 
 **Claude Code**
@@ -521,6 +550,8 @@ Before Lab work starts:
 - Sign with a Developer ID certificate. Notarize every release.
 - Distribute as a notarized `.dmg` on GitHub Releases and as a Homebrew cask.
 - No Mac App Store build.
+- Bundle id: `io.github.vilmerfrost.spyre`. `LSUIElement` is true, so Spyre has no Dock icon.
+- `scripts/build-app.sh` builds a local, ad-hoc signed `.build/app/Spyre.app`. Release steps: `docs/release.md`.
 
 ## 9. Non-goals for MVP
 
