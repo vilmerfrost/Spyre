@@ -219,6 +219,32 @@ struct ClaudeCodeAdapterTests {
         #expect(await harness.refresh()["claude-child-203"]?.status == .done)
     }
 
+    @Test func childRowIsDroppedWhenRegistryFileAppears() async throws {
+        let harness = try Harness(sessions: [])
+        defer { harness.cleanUp() }
+        harness.processes.set([claude(101)], cwds: [101: "/Users/you/Projects/app"])
+        #expect(await harness.refresh()["claude-child-101"] != nil)
+
+        let fixture = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Fixtures/claude/2.1.295/sessions/101.json")
+        try FileManager.default.copyItem(at: fixture, to: harness.session("101.json"))
+        let rows = await harness.refresh()
+        #expect(rows.keys.sorted() == ["\(uuid)101"])
+    }
+
+    @Test func exitingSessionDoesNotBecomeChild() async throws {
+        let harness = try Harness(sessions: ["101.json"])
+        defer { harness.cleanUp() }
+        harness.processes.set([claude(101)], cwds: [101: "/Users/you/Projects/app"])
+        #expect(await harness.refresh()["\(uuid)101"]?.status == .working)
+
+        // `/exit` deletes the registry file while the process still runs for a moment.
+        try FileManager.default.removeItem(at: harness.session("101.json"))
+        let rows = await harness.refresh()
+        #expect(rows.keys.sorted() == ["\(uuid)101"])
+        #expect(rows["\(uuid)101"]?.status == .done)
+    }
+
     @Test func childCandidateWithoutTranscriptIsNotShown() async throws {
         let harness = try Harness(sessions: [])
         defer { harness.cleanUp() }

@@ -113,7 +113,8 @@ Child sessions show under their parent row. See 4.6.
 | `done` | The process has ended. | No |
 | `unknown` | Spyre cannot read the source, or the sources disagree in a way Spyre cannot resolve. | No |
 
-Remove `done` rows from the list after 10 minutes.
+Remove `done` rows from the list after `doneRowTimeout` (10 min).
+Adapters keep reporting `done`. The app hides the rows, so the timeout is set in one place.
 
 **No-activity flag.**
 The status `stuck` does not exist.
@@ -136,6 +137,7 @@ Spyre stores these values in its config, not in code:
 | `alertDelay` | 3 s | Attention effects (4.1) |
 | `noActivityThreshold` | 10 min | No-activity flag (4.4) |
 | `adapterRefreshTimeout` | 2 s | Stale mark (4.4, 6.4) |
+| `doneRowTimeout` | 10 min | Hiding `done` rows (4.4) |
 
 The MVP has no settings UI for these values.
 
@@ -146,6 +148,7 @@ Spyre reads the values from `~/Library/Application Support/Spyre/config.json`.
 {
   "adapterRefreshTimeout" : 2,
   "alertDelay" : 3,
+  "doneRowTimeout" : 600,
   "noActivityThreshold" : 600
 }
 ```
@@ -154,6 +157,7 @@ Spyre reads the values from `~/Library/Application Support/Spyre/config.json`.
 - On launch, Spyre creates the file with the defaults if it does not exist.
 - Spyre reloads the file when it changes. This includes an editor that saves by replacing the file.
 - Spyre never crashes on a bad file. Each problem gives a warning, and the menubar window shows the first warning.
+  Spyre also logs each warning with `os.Logger` (category `config`). A log names the key and the problem only.
 
 | Problem | Result |
 |---------|--------|
@@ -167,6 +171,7 @@ Spyre reads the values from `~/Library/Application Support/Spyre/config.json`.
 | `alertDelay` | 0 – 300 |
 | `noActivityThreshold` | 60 – 86400 |
 | `adapterRefreshTimeout` | 0.5 – 60 |
+| `doneRowTimeout` | 0 – 86400 |
 
 ### 4.5 Status sources
 
@@ -225,6 +230,7 @@ It writes no registry file (verified).
 Spyre finds child sessions this way:
 
 1. The process scan lists Claude Code processes. A live Claude Code process with no registry file is a child session candidate.
+   A process that has or had a registry file is never a child (verified: a new session runs before it writes the file, and `/exit` deletes the file before the process ends).
 2. Spyre reads the process working directory with `proc_pidinfo` (as for Codex, 5.2 C).
 3. Spyre finds the newest transcript file in `~/.claude/projects/<encoded-cwd>/` whose `sessionId` is not in any registry file. This gives last activity and git branch.
 4. Spyre walks the parent process chain (parent PID, then its parent PID). The first process that has a registry file is the parent session.

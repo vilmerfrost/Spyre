@@ -8,16 +8,23 @@ public struct SpyreConfig: Sendable, Equatable {
     public var noActivityThreshold: TimeInterval
     /// Seconds before an adapter refresh counts as timed out.
     public var adapterRefreshTimeout: TimeInterval
+    /// Seconds a `done` row stays in the list after the session ended.
+    public var doneRowTimeout: TimeInterval
 
     public init(
         alertDelay: TimeInterval = 3,
         noActivityThreshold: TimeInterval = 10 * 60,
-        adapterRefreshTimeout: TimeInterval = 2
+        adapterRefreshTimeout: TimeInterval = 2,
+        doneRowTimeout: TimeInterval = 10 * 60
     ) {
         self.alertDelay = alertDelay
         self.noActivityThreshold = noActivityThreshold
         self.adapterRefreshTimeout = adapterRefreshTimeout
+        self.doneRowTimeout = doneRowTimeout
     }
 
     public static let `default` = SpyreConfig()
+
+    /// The largest `doneRowTimeout` (24 h). Adapters report `done` sessions at least this long.
+    public static let maxDoneRowTimeout: TimeInterval = 86_400
 }
