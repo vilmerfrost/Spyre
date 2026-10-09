@@ -42,13 +42,13 @@ It never starts, stops, or changes an agent session.
 
 | Surface | Content | In MVP |
 |---------|---------|--------|
-| Menubar item | Spyre icon, a badge, and a short session list. | Yes |
-| Main window | A section switcher: Radar, Grab, Lab. Grab and Lab show "Coming soon". | Yes |
+| Menubar item | Spyre icon and a badge. Its window shows the count line, the top rows (Needs you, then Working, at most `size.menu.maxRows`), "Open Spyre", and "Show welcome screen". | Yes |
+| Main window | A pill section switcher (Radar, Grab, Lab) and the shortcut hint. Radar shows the count line and the session list (4.2). Grab and Lab show "Coming soon". | Yes |
 | Welcome window | The first-run screen (4.8). | Yes |
 | macOS Dock icon | Not the dock strip above. Off by default. `showDockIcon` (4.4) turns it on. A click opens the main window. | Yes |
 | Dock | A vertical strip on one screen edge. One icon per live session. | No. Planned for v0.2. Default: hidden. |
 
-`DESIGN.md` defines the look of all surfaces.
+`DESIGN.md` defines the look of all surfaces. All windows follow the macOS appearance (Fog Light or Fog Dark).
 
 **Reach Spyre without the menubar icon.** The menubar can hide the icon (the notch, a full menubar).
 These paths open the main window and bring it to the front:
@@ -83,6 +83,11 @@ Spyre must never assume that a `waiting` state stays.
 ### 4.2 Session list
 
 Click the menubar icon to open the short list. The Radar section in the main window shows the full list.
+
+**Count line.** Above the list: "N needs you", "N working", "N idle", in big numbers with tabular digits.
+"Needs you" counts `waiting` sessions (the badge number). "Working" counts `working` and `starting`.
+All three always show, so the line does not shift. Only a non-zero "needs you" uses the waiting color.
+
 Each row shows:
 
 | Field | Source |
@@ -94,10 +99,16 @@ Each row shows:
 | Status | See 4.4 |
 | Last activity | Relative time, for example "2 min ago" |
 | No-activity flag | See 4.4. Only on `working` rows. |
+| Waiting reason | Only on `waiting` rows, for example "Permission prompt". "Needs input" when the source gives none. |
+
+Line 1 is the title. Line 2 is project · branch · agent, then tags (`exec`, `experimental`, `stale`).
+Line 2 leaves out the project when the title is the project name. The right side shows the waiting reason,
+the no-activity flag, or a status the group header does not say, then the last activity ("20 s", "4 min").
+A working row shows a slow spinner.
 
 Group the rows by status. Show the groups in this order, each with a header:
 
-1. Waiting
+1. Needs you (the `waiting` status)
 2. Working
 3. Idle
 4. Unknown (shown only when it has rows)
@@ -106,6 +117,9 @@ Group the rows by status. Show the groups in this order, each with a header:
 - Inside `Working`, rows with the no-activity flag come first.
 - Inside each group, the newest last activity comes first.
 - Hide a group header when the group is empty.
+- A group header shows the number of top-level rows in the group.
+- Idle and Done are folded by default. Their header is a disclosure row with the count. A click unfolds the group.
+  Spyre remembers unfolded groups in memory for the app run only. Reason: these rows need no action.
 - Freeze the row order while the pointer is over the list. Rows must not move under the pointer. Status text and badges still update. Apply the new order when the pointer leaves the list.
 - Reason: rows that jump under the pointer cause wrong clicks. Another session monitor removed status sorting for this reason (`research/competitors.md`).
 
@@ -118,10 +132,10 @@ Child sessions show under their parent row. See 4.6.
 
 ### 4.3 Open a session's project
 
-- Click a row to open the session's working directory in the user's terminal app.
-- The user picks the terminal app in Settings. Default: Terminal.app.
-- Spyre opens a new window at that folder. It does not find the existing tab.
-- Jump to the exact terminal tab is not in the MVP.
+- Hover a row to show "Open folder". The row's context menu has "Open Folder in Finder" too.
+  Both open the session's working directory in Finder (`NSWorkspace`). This only shows the folder. It changes nothing.
+- Later, not in the MVP: open the folder in the user's terminal app, picked in Settings (default: Terminal.app),
+  in a new window. Jump to the exact terminal tab is not planned.
 
 ### 4.4 Status model
 
@@ -279,8 +293,8 @@ Spyre finds child sessions this way:
 2. Spyre reads the process working directory with `proc_pidinfo` (as for Codex, 5.2 C).
 3. Spyre finds the newest transcript file in `~/.claude/projects/<encoded-cwd>/` whose `sessionId` is not in any registry file. This gives last activity and git branch.
 4. Spyre walks the parent process chain (parent PID, then its parent PID). The first process that has a registry file is the parent session.
-5. Spyre shows the child row under the parent row, with the label "child session".
-6. When no parent is found, Spyre shows the child as its own top-level row, with the label "child, no parent".
+5. Spyre shows the child row under the parent row, with a corner arrow and the tag "experimental". The record keeps the label "child session"; the row leaves it out because the arrow says it.
+6. When no parent is found, Spyre shows the child as its own top-level row, with the tags "child, no parent" and "experimental".
 7. A candidate whose working directory is readable but has no unclaimed transcript is not shown. Desktop-app Claude processes with no registry file and no transcript were observed. They are not sessions.
 
 The record has `isChildSession = true`. Its ID is `claude-child-<pid>`.
