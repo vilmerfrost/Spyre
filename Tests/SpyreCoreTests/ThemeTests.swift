@@ -11,19 +11,93 @@ struct ThemeTests {
         #expect(["light", "dark"].contains(theme.appearance))
     }
 
-    /// `DESIGN.md` 10.1: every built-in theme meets WCAG AA for text and status labels.
+    /// `DESIGN.md` 10.1: every built-in theme meets WCAG AA (4.5:1) for every text pair the UI draws:
+    /// text and status labels on the background, the atmosphere, row surfaces, and controls.
     @Test(arguments: Theme.builtInNames)
     func builtInThemeMeetsContrast(name: String) throws {
         let theme = try Theme.builtIn(name).filled(from: Theme.builtIn("light"))
-        let foregrounds = ["color.text.primary", "color.text.secondary"]
+        let foregrounds = ["color.text.primary", "color.text.secondary", "color.flag.noActivity"]
             + SessionStatus.allCases.filter { $0 != .starting }.map { "color.status.\($0.rawValue)" }
-        for background in ["color.background.base", "color.surface.card"] {
-            let back = try #require(theme.color(background))
+        let opaque = [
+            "color.background.base", "color.surface.card", "color.surface.row", "color.surface.rowHover",
+            "color.surface.waiting", "color.surface.controlSelected",
+            "color.atmosphere.sky", "color.atmosphere.horizon", "color.atmosphere.fog",
+        ]
+        var backgrounds: [(String, RGBA)] = try opaque.map { ($0, try #require(theme.color($0))) }
+        // The section switcher track is translucent. It sits on the top of the atmosphere.
+        let track = try #require(theme.color("color.surface.control"))
+        let sky = try #require(theme.color("color.atmosphere.sky"))
+        backgrounds.append(("color.surface.control over sky", track.composited(over: sky)))
+        for (background, back) in backgrounds {
+            #expect(back.alpha == 1, "\(name): \(background) must be opaque")
             for token in foregrounds {
                 let ratio = try #require(theme.color(token)).contrast(with: back)
                 #expect(ratio >= 4.5, "\(name): \(token) on \(background) is \(ratio)")
             }
         }
+        let accent = try #require(theme.color("color.accent"))
+        let onAccent = try #require(theme.color("color.text.onAccent"))
+        #expect(onAccent.contrast(with: accent) >= 4.5, "\(name): onAccent on accent")
+    }
+
+    /// `DESIGN.md` 3, rule 6: the light theme holds the full set, so every theme has every token after the fill.
+    @Test(arguments: Theme.builtInNames)
+    func everyThemeHasEveryTokenAfterFill(name: String) throws {
+        let light = try Theme.builtIn("light")
+        let theme = try Theme.builtIn(name).filled(from: light)
+        #expect(Set(theme.tokens.keys) == Set(light.tokens.keys))
+        for token in Self.requiredTokens {
+            #expect(theme.tokens[token] != nil, "\(name) has no \(token)")
+        }
+    }
+
+    /// The tokens the redesigned views read. `DESIGN.md` 5.
+    static let requiredTokens = [
+        "color.atmosphere.sky", "color.atmosphere.horizon", "color.atmosphere.fog", "color.atmosphere.ridgeFar",
+        "color.atmosphere.ridgeMid", "color.atmosphere.ridgeNear", "color.atmosphere.light",
+        "color.surface.row", "color.surface.rowHover", "color.surface.waiting", "color.surface.control",
+        "color.surface.controlSelected", "color.border.row", "color.border.divider", "color.border.waiting",
+        "color.text.onAccent", "color.shadow.panel", "color.flag.noActivity",
+        "opacity.atmosphere.scenery", "opacity.atmosphere.dense", "opacity.atmosphere.fog",
+        "opacity.atmosphere.light", "blur.atmosphere.ridge",
+        "radius.panel", "radius.row", "radius.button", "radius.tag", "space.xxs",
+        "size.row.height", "size.row.compactHeight", "size.content.maxWidth", "size.status.column",
+        "size.spinner.line", "size.switcher.height", "size.window.defaultWidth", "size.window.defaultHeight",
+        "size.menu.maxRows", "size.atmosphere.drift", "size.welcome.scenery", "size.welcome.sceneHeight",
+        "shadow.panel.radius", "shadow.panel.y",
+        "font.rowTitle.size", "font.section.size", "font.control.size", "font.tag.size", "font.count.size",
+        "font.countCompact.size", "font.count.weight", "motion.duration.drift",
+        "icon.action.openFolder", "icon.disclosure", "icon.child",
+    ]
+
+    @Test func darkAndLightAreDifferentAppearances() throws {
+        #expect(try !Theme.builtIn("light").isDark)
+        #expect(try Theme.builtIn("dark").isDark)
+        #expect(try !Theme.builtIn("high-contrast").isDark)
+        #expect(try Theme.builtIn("light").name == "Fog Light")
+        #expect(try Theme.builtIn("dark").name == "Fog Dark")
+    }
+
+    /// The theme follows the macOS appearance. `DESIGN.md` 8.1.
+    @Test func themeFollowsSystemAppearance() {
+        #expect(Theme.builtInName(systemIsDark: true) == "dark")
+        #expect(Theme.builtInName(systemIsDark: false) == "light")
+    }
+
+    @Test func appearanceOverrideReadsOnlyTheHiddenArgument() {
+        #expect(Theme.appearanceOverride(arguments: ["Spyre", "-SpyreAppearance", "dark"]) == true)
+        #expect(Theme.appearanceOverride(arguments: ["Spyre", "-SpyreAppearance", "Light"]) == false)
+        #expect(Theme.appearanceOverride(arguments: ["Spyre", "-SpyreAppearance", "blue"]) == nil)
+        #expect(Theme.appearanceOverride(arguments: ["Spyre", "-SpyreAppearance"]) == nil)
+        #expect(Theme.appearanceOverride(arguments: ["Spyre"]) == nil)
+    }
+
+    @Test func compositingTranslucentColor() throws {
+        let half = try #require(RGBA(hex: "#00000080"))
+        let white = try #require(RGBA(hex: "#FFFFFF"))
+        let result = half.composited(over: white)
+        #expect(result.alpha == 1)
+        #expect(abs(result.red - (1 - Double(0x80) / 255)) < 0.0001)
     }
 
     @Test func invalidColorIsDroppedWithWarning() throws {
@@ -41,8 +115,8 @@ struct ThemeTests {
 
     @Test func missingTokensComeFromBase() throws {
         let dark = try Theme.builtIn("dark").filled(from: Theme.builtIn("light"))
-        #expect(dark.number("radius.card") == 20)
-        #expect(dark.color("color.text.primary") == RGBA(hex: "#E8EAED"))
+        #expect(dark.number("radius.panel") == 8)
+        #expect(dark.color("color.text.primary") == RGBA(hex: "#E4E7EA"))
     }
 
     @Test func hexParsing() {

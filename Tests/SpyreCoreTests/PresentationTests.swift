@@ -160,4 +160,16 @@ struct PresentationTests {
         #expect(sessions.menuRows(limit: 2).map(\.row.id) == ["w", "k1"])
         #expect(sessions.menuRows(limit: 0).isEmpty)
     }
+
+    // MARK: Atmosphere geometry
+
+    @Test func ridgesStayInsideTheViewAndFarRidgeIsHighest() throws {
+        #expect(Atmosphere.ridges.count == 3)
+        for ridge in Atmosphere.ridges {
+            #expect(ridge.heights.count == Atmosphere.samples)
+            #expect(ridge.heights.allSatisfy { (0...1).contains($0) })
+        }
+        let tops = Atmosphere.ridges.map { $0.heights.min() ?? 1 }
+        #expect(tops == tops.sorted())
+    }
 }
