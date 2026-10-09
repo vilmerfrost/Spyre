@@ -1,7 +1,10 @@
 import SwiftUI
 
 /// The first-run screen. It only renders. `WelcomePresenter` decides when it shows. `SPEC.md` 4.8.
+/// "Start watching" has no keyboard shortcut. A stray Return must not accept the screen. `SPEC.md` 4.8.
 struct WelcomeView: View {
+    /// The global shortcut in human form, for example "⌃⌥S".
+    let shortcut: String
     let onStart: () -> Void
     @Environment(\.tokens) private var tokens
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
@@ -30,6 +33,11 @@ struct WelcomeView: View {
                     title: "Read-only",
                     text: "Spyre never changes your agent sessions or settings."
                 )
+                WelcomeSection(
+                    title: "Open Spyre",
+                    text: "Press \(shortcut), or open the Spyre app again. "
+                        + "The menubar icon can be hidden when the menubar is full."
+                )
             }
             .padding(tokens.value("space.lg"))
             .background(
@@ -44,7 +52,6 @@ struct WelcomeView: View {
                 .buttonStyle(.borderedProminent)
                 .buttonBorderShape(.capsule)
                 .tint(tokens.color("color.accent"))
-                .keyboardShortcut(.defaultAction)
                 .accessibilityLabel("Start watching")
                 .accessibilityHint("Closes this screen. It does not show again at launch.")
                 .frame(maxWidth: .infinity, alignment: .trailing)

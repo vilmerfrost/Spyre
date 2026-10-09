@@ -21,7 +21,6 @@ struct MenuBarLabel: View {
 struct MenuContentView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.tokens) private var tokens
-    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         VStack(alignment: .leading, spacing: tokens.value("space.md")) {
@@ -34,7 +33,7 @@ struct MenuContentView: View {
                     .font(tokens.font("label"))
                     .foregroundStyle(tokens.color("color.text.secondary"))
             }
-            Button("Open Spyre") { openWindow(id: "main") }
+            Button("Open Spyre") { model.showMainWindow() }
                 .buttonStyle(.borderedProminent)
                 .tint(tokens.color("color.accent"))
             Button("Show welcome screen") { model.showWelcome() }
