@@ -55,6 +55,7 @@ Spyre observes. It never acts.
 - Never commit screenshots or files with personal data.
 - Test the bad cases: missing file, empty file, truncated last line, unknown fields, unknown status values, dead PID.
 - Tests must not depend on the clock. Inject a clock.
+- Put every test file's tests in a `@Suite(.timeLimit(.minutes(1)))`. A lint test checks this.
 - Tests must not depend on the file system outside a temp directory.
 
 ## Git workflow

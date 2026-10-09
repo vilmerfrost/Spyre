@@ -11,7 +11,7 @@ permissions:
 jobs:
   build-and-test:
     runs-on: macos-15
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - name: Show toolchain
@@ -21,6 +21,7 @@ jobs:
       - name: Build
         run: swift build -Xswiftc -warnings-as-errors
       - name: Test
+        timeout-minutes: 10
         run: swift test
       - name: Build app bundle
         run: scripts/build-app.sh
