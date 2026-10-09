@@ -3,7 +3,7 @@
 Spyre is a macOS menubar app for AI coding agents.
 
 It shows every live Claude Code and Codex session on your Mac in one list.
-It shows which sessions are working, waiting for you, stuck, or done.
+It shows which sessions are working, waiting for you, idle, or done.
 
 Spyre is read-only. It never starts, stops, or changes an agent session.
 All data stays on your Mac. Spyre makes no network calls.

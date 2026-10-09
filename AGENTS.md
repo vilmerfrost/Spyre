@@ -1,6 +1,7 @@
 # AGENTS.md
 
 Rules for all coding agents in this repo. Read `SPEC.md` before you start a task.
+Read `DESIGN.md` before you change any view.
 
 ## Stack
 
@@ -26,6 +27,18 @@ Spyre observes. It never acts.
 - Never send signals to agent processes. `kill(pid, 0)` for a liveness check is allowed.
 - Spyre may write only inside `~/Library/Application Support/Spyre/`.
 - In tests, use fixture files in the repo. Never read the real `~/.claude` or `~/.codex`.
+- Never read the environment variables of another process.
+
+## Adapters
+
+`SPEC.md` section 6 defines the adapter contract.
+
+- Each agent type is one adapter, for example `ClaudeCodeAdapter` or `CodexAdapter`.
+- An adapter is composed of source readers. One source reader reads one data source.
+- New agent support means a new adapter. No agent-specific code outside its adapter.
+- MVP adapters are observe-only. Do not add steer, approve, or stop code.
+- Spyre never types into a terminal or sends keystrokes to another app.
+- A source reader that cannot parse its data gives `unknown`. It never crashes the app.
 
 ## No network
 
@@ -39,6 +52,7 @@ Spyre observes. It never acts.
 - Every feature needs tests. No tests means the task is not done.
 - Every parser needs fixture tests. Put fixtures in `Tests/Fixtures/<agent>/<version>/`.
 - Fixtures must be fake data. Never commit real session files, paths with real names, or prompts.
+- Never commit screenshots or files with personal data.
 - Test the bad cases: missing file, empty file, truncated last line, unknown fields, unknown status values, dead PID.
 - Tests must not depend on the clock. Inject a clock.
 - Tests must not depend on the file system outside a temp directory.
@@ -66,8 +80,9 @@ Spyre observes. It never acts.
 - Make model types `Sendable`.
 - Use `Codable` for JSON. Make all decoded fields optional unless the format guarantees them.
 - Decode unknown enum values to an `.unknown(String)` case. Never crash on new values.
-- Put each agent source behind one protocol, for example `SessionSource`. Claude and Codex are two implementations.
+- Put each agent behind one adapter protocol. Claude Code and Codex are two implementations.
 - Keep views small. Move logic out of views into testable types.
+- Views use design tokens only. A hardcoded color or size in a view is a bug. See `DESIGN.md`.
 - Use `os.Logger` for logs. Never log prompts, message content, or tokens.
 - Write a doc comment for each public type. Do not comment obvious code.
 - Run `swift-format` before you commit, if the repo has a config.
@@ -88,7 +103,7 @@ A task is done only when all items are true:
 4. The project builds with zero warnings.
 5. No new network code. No writes outside Spyre's own folder.
 6. No real user data in the repo.
-7. `SPEC.md` is updated if behavior or data sources changed.
+7. `SPEC.md` is updated if behavior or data sources changed. `DESIGN.md` is updated if tokens changed.
 8. The commit messages follow Conventional Commits.
 9. The PR is open against `main`, with a description of tests run and not run.
 
