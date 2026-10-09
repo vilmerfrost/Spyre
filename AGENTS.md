@@ -60,6 +60,7 @@ Spyre observes. It never acts.
 ## Git workflow
 
 - Never push to `main`. Never force-push to `main`.
+- Never create worktrees or build folders inside `~/Desktop` or `~/Documents`. iCloud syncs them, and this breaks code signing. Use `~/Developer`.
 - Create a feature branch for each task: `feat/…`, `fix/…`, `docs/…`, `test/…`, `chore/…`.
 - Keep PRs small. One concern per PR. Target under 400 changed lines.
 - Use Conventional Commits: `type(scope): summary`.
