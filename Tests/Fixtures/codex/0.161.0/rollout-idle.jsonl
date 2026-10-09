@@ -1,0 +1,4 @@
+{"timestamp":"2026-10-09T10:00:00.000Z","ordinal":0,"type":"session_meta","payload":{"id":"00000000-0000-0000-0000-000000000002","cwd":"/Users/you/Projects/web","cli_version":"0.161.0","originator":"codex-tui"}}
+{"timestamp":"2026-10-09T10:00:05.000Z","ordinal":1,"type":"event_msg","payload":{"type":"task_started"}}
+{"timestamp":"2026-10-09T10:00:09.000Z","ordinal":2,"type":"event_msg","payload":{"type":"task_complete","new_field":true}}
+{"timestamp":"2026-10-09T10:00:10.000Z","ordinal":3,"type":"future_record_type","payload":"not an object"}

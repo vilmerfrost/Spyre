@@ -208,7 +208,8 @@ The user pastes it.
 - Codex shows `working`, `idle`, and `done` in the MVP.
 - Codex has no `waiting` status in the MVP. Section 5.2 explains why.
 - Spyre finds live Codex sessions from the process list and the working directory (5.2 C).
-- Known limit: two Codex sessions in the same folder show as one session.
+- Known limit: two Codex sessions in the same folder show as one session (5.2 C).
+- ChatGPT desktop threads do not show as live in the MVP (5.2 C).
 
 ### 4.6 Child sessions
 
@@ -406,15 +407,20 @@ Lock files do not show liveness (verified):
 
 Use the process table instead:
 
-1. List processes named `codex` that are not `app-server` or `app-server-daemon` processes.
+1. List processes whose executable (`proc_pidpath`) is named `codex` and that have a controlling terminal (`proc_pidinfo` `PROC_PIDTBSDINFO`, flag `PROC_FLAG_CONTROLT`). This drops the `app-server`, `app-server-daemon`, and `exec-server` processes. The ChatGPT app's `app-server` and `exec-server` have no controlling terminal (verified). The detached `app-server-daemon` is expected to have none (UNKNOWN, not verified).
+   - Spyre does not read process arguments. On macOS, `KERN_PROCARGS2` returns the arguments and the environment in one buffer.
 2. Read each process's working directory with `proc_pidinfo` (`PROC_PIDVNODEPATHINFO`). The TUI's working directory is the project folder (verified).
-3. Match each TUI to the thread with the same `cwd` and the newest `updated_at_ms`.
-4. A thread with a matching live TUI is live. A thread without one is `done`.
+3. Match each TUI to the non-archived thread with the same `cwd` and the newest `updated_at_ms`.
+4. A thread with a matching live TUI is live. Its rollout tail gives `working` or `idle` (B). A rollout with records but no status event gives `idle`. An unreadable or unparsable rollout gives `unknown` and a diagnostic.
+5. A thread without a live TUI is `done`. Spyre reports it only while its `updated_at_ms` is less than 10 min old.
+6. When the thread index cannot be read, each live TUI folder shows as one `unknown` row, with a diagnostic.
 
 Limits:
 
-- Two TUIs in the same folder cannot be told apart. Spyre shows them as one session.
-- ChatGPT desktop threads have no TUI. In the MVP, Spyre shows a desktop thread as live only while the ChatGPT app runs and the thread was updated in the last 30 min.
+- Two TUIs in the same folder cannot be told apart. Spyre shows one row for that folder: the thread with the newest `updated_at_ms`, with that thread's status. The other thread in that folder does not show, not even as `done`. The row stays live until the last TUI in that folder exits.
+- A TUI that has no thread row yet does not show.
+- Spyre compares paths as strings after it removes `.`, `..`, and a trailing `/`. It does not resolve symlinks.
+- ChatGPT desktop threads have no TUI. Not implemented in the MVP: Spyre never shows a desktop thread as live. A desktop thread updated in the last 10 min shows as `done`. Reason: no verified column tells desktop threads from TUI threads (`source` and `originator` values vary). See section 11.
 
 **D. Codex hooks**
 
