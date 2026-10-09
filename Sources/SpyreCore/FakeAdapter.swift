@@ -55,16 +55,17 @@ public struct FakeAdapter: AgentAdapter {
             SessionRecord(
                 id: "fake-1", agent: .claudeCode, workingDirectory: "/Users/you/Projects/app",
                 title: "Fix the login redirect", branch: "main", status: .waiting, waitingReason: "permission prompt",
-                lastActivity: now.addingTimeInterval(-20)
+                lastActivity: now.addingTimeInterval(-20), host: .cli, startedAt: now.addingTimeInterval(-2_400)
             ),
             SessionRecord(
                 id: "fake-2", agent: .codex, workingDirectory: "/Users/you/Projects/api",
-                branch: "feat/login", status: .waiting, lastActivity: now.addingTimeInterval(-90)
+                branch: "feat/login", status: .waiting, lastActivity: now.addingTimeInterval(-90), host: .codex,
+                startedAt: now.addingTimeInterval(-900), agentVersion: "0.161.0"
             ),
             SessionRecord(
                 id: "fake-3", agent: .claudeCode, workingDirectory: "/Users/you/Projects/site",
                 title: "Tidy the navigation bar", branch: "fix/nav", status: .working,
-                lastActivity: now.addingTimeInterval(-5)
+                lastActivity: now.addingTimeInterval(-5), host: .desktop
             ),
             SessionRecord(
                 id: "fake-4", agent: .claudeCode, workingDirectory: "/Users/you/Projects/app",
@@ -80,7 +81,7 @@ public struct FakeAdapter: AgentAdapter {
             ),
             SessionRecord(
                 id: "fake-7", agent: .codex, workingDirectory: "/Users/you/Projects/tools", branch: "HEAD",
-                status: .working, lastActivity: now.addingTimeInterval(-12), label: "exec"
+                status: .working, lastActivity: now.addingTimeInterval(-12), label: "exec", host: .exec
             ),
             SessionRecord(
                 id: "fake-8", agent: .claudeCode, workingDirectory: "/Users/you/Projects/blog",

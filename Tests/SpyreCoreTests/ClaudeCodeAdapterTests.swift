@@ -91,6 +91,20 @@ struct ClaudeCodeAdapterTests {
         #expect(sessions["\(uuid)106"]?.status == .unknown)
     }
 
+    /// The detail line: host from `entrypoint`, start from `startedAt`, and the PID for "Show app".
+    @Test func registryGivesHostStartAndProcessID() async throws {
+        let harness = try Harness(sessions: ["101.json", "102.json", "106.json"])
+        defer { harness.cleanUp() }
+        harness.processes.set([claude(101), claude(102), claude(106)])
+        let sessions = await harness.refresh()
+        #expect(sessions["\(uuid)101"]?.host == .cli)
+        #expect(sessions["\(uuid)102"]?.host == .desktop)
+        #expect(sessions["\(uuid)106"]?.host == .vscode)
+        #expect(sessions["\(uuid)101"]?.processID == 101)
+        #expect(sessions["\(uuid)101"]?.startedAt == Date(timeIntervalSince1970: 1_800_000_000))
+        #expect(sessions["\(uuid)101"]?.agentVersion == nil)
+    }
+
     @Test func missingStatusIsStartingThenUnknownAfterTimeout() async throws {
         let harness = try Harness(sessions: ["103.json"])
         defer { harness.cleanUp() }

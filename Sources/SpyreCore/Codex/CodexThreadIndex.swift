@@ -15,6 +15,8 @@ struct CodexThread: Sendable, Equatable {
     var originator: String?
     /// `threads.title`. Codex can derive it from the first prompt. Shown locally only. Never logged.
     var title: String? = nil
+    /// `created_at_ms`, else `created_at` (seconds). `nil` when the schema has neither.
+    var createdAt: Date? = nil
 }
 
 /// Reads `~/.codex/state_<n>.sqlite`, table `threads`. `SPEC.md` 5.2 A.
@@ -53,8 +55,10 @@ struct CodexThreadIndex: Sendable {
         let columns = columnNames(db)
         let optional = ["cli_version", "source", "originator", "title"]
             .map { columns.contains($0) ? $0 : "NULL" }.joined(separator: ", ")
+        let created = columns.contains("created_at_ms") ? "created_at_ms"
+            : columns.contains("created_at") ? "created_at * 1000" : "NULL"
         let sql = """
-            SELECT id, rollout_path, cwd, git_branch, updated_at_ms, \(optional)
+            SELECT id, rollout_path, cwd, git_branch, updated_at_ms, \(optional), \(created)
             FROM threads WHERE archived = 0
             """
         var statement: OpaquePointer?
@@ -78,7 +82,9 @@ struct CodexThreadIndex: Sendable {
                 cliVersion: text(query, 5),
                 source: text(query, 6),
                 originator: text(query, 7),
-                title: text(query, 8)
+                title: text(query, 8),
+                createdAt: sqlite3_column_type(query, 9) == SQLITE_NULL ? nil
+                    : Date(timeIntervalSince1970: Double(sqlite3_column_int64(query, 9)) / 1000)
             ))
         }
         return .success(rows)

@@ -57,10 +57,15 @@ struct SessionListView: View {
     @Environment(\.tokens) private var tokens
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    /// The row order while the pointer is over the list. Rows never move under the pointer. `SPEC.md` 4.2.
+    @State private var frozen: [SessionSection]?
+
     var body: some View {
         let fold = IdleFold(now: now, after: model.config.idleFoldAfter, isExpanded: model.earlierExpanded)
+        let fresh = sessions.sections(expanded: model.expandedGroups, idleFold: fold)
+        let shown = frozen.map { fresh.frozen(to: $0) } ?? fresh
         VStack(alignment: .leading, spacing: tokens.value("space.lg")) {
-            ForEach(sessions.sections(expanded: model.expandedGroups, idleFold: fold)) { section in
+            ForEach(shown) { section in
                 VStack(alignment: .leading, spacing: tokens.value("space.sm")) {
                     if section.isCollapsible {
                         DisclosureHeader(section: section) { toggle(section.group) }
@@ -73,6 +78,7 @@ struct SessionListView: View {
                 }
             }
         }
+        .onHover { inside in frozen = inside ? shown : nil }
     }
 
     private func panel(_ section: SessionSection) -> some View {
@@ -190,129 +196,5 @@ private struct DisclosureHeader: View {
         .accessibilityLabel("\(section.group.title), \(section.count) sessions")
         .accessibilityValue(section.isExpanded ? "Expanded" : "Collapsed")
         .accessibilityHint(section.isExpanded ? "Hides these sessions." : "Shows these sessions.")
-    }
-}
-
-/// One session row, about 44 points high. Status shows as glyph, color, and text, never color alone.
-/// A compact row (menubar window) shows the status note on line 2, so the title keeps its room.
-struct SessionRow: View {
-    let row: SessionListRow
-    /// The group the row shows in. A nested child can have another status.
-    let group: StatusGroup
-    let now: Date
-    var compact = false
-    @Environment(AppModel.self) private var model
-    @Environment(\.tokens) private var tokens
-    @State private var hovering = false
-
-    private var session: SessionRecord { row.session }
-    /// Idle and done rows need no action. Their titles step back, so active rows lead.
-    private var isQuiet: Bool { session.status == .idle || session.status == .done }
-
-    var body: some View {
-        let text = SessionRowText(session, homeDirectory: NSHomeDirectory(), isNested: row.isNested)
-        HStack(spacing: 0) {
-            leading
-            VStack(alignment: .leading, spacing: tokens.value("space.xxs")) {
-                // The time sits on line 1's baseline in every row, one-line and two-line alike.
-                HStack(alignment: .firstTextBaseline, spacing: tokens.value("space.sm")) {
-                    Text(text.title)
-                        .font(tokens.font("rowTitle"))
-                        .foregroundStyle(tokens.color(isQuiet ? "color.text.secondary" : "color.text.primary"))
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                        .layoutPriority(1)
-                    Spacer(minLength: tokens.value("space.sm"))
-                    trailing
-                }
-                HStack(spacing: tokens.value("space.xs")) {
-                    if compact, let note {
-                        Text(note.text)
-                            .font(tokens.font("label"))
-                            .foregroundStyle(tokens.color(note.color))
-                            .fixedSize()
-                    }
-                    Text(text.detail)
-                        .font(tokens.font("label"))
-                        .foregroundStyle(tokens.color("color.text.secondary"))
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                    ForEach(text.tags, id: \.self) { RowTag(text: $0).fixedSize() }
-                }
-            }
-        }
-        .padding(.horizontal, tokens.value("space.md"))
-        .frame(minHeight: tokens.value(compact ? "size.row.compactHeight" : "size.row.height"))
-        .background(tokens.color("color.surface.rowHover").opacity(hovering ? 1 : 0))
-        .contentShape(Rectangle())
-        .onHover { hovering = $0 }
-        .animation(.easeOut(duration: tokens.value("motion.duration.fast")), value: hovering)
-        .contextMenu {
-            Button("Open folder in Finder") { model.openFolder(session.workingDirectory) }
-                .disabled(session.workingDirectory.isEmpty)
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityText(text))
-        .accessibilityAction(named: "Open folder in Finder") { model.openFolder(session.workingDirectory) }
-    }
-
-    /// The status glyph column. A nested child puts the corner arrow in the parent's glyph column and its own
-    /// glyph at the parent's title edge, so the child title is indented by `size.child.indent`.
-    @ViewBuilder private var leading: some View {
-        if row.isNested {
-            Image(systemName: tokens.icon("icon.child"))
-                .font(tokens.font("label"))
-                .foregroundStyle(tokens.color("color.text.secondary"))
-                .frame(width: tokens.value("size.status.column"))
-                .padding(.trailing, tokens.value("space.md"))
-            StatusGlyph(status: session.status, column: "size.icon.status")
-                .padding(.trailing, tokens.value("size.child.indent") - tokens.value("size.icon.status"))
-        } else {
-            StatusGlyph(status: session.status)
-                .padding(.trailing, tokens.value("space.md"))
-        }
-    }
-
-    @ViewBuilder private var trailing: some View {
-        HStack(alignment: .firstTextBaseline, spacing: tokens.value("space.sm")) {
-            if hovering, !session.workingDirectory.isEmpty {
-                Button {
-                    model.openFolder(session.workingDirectory)
-                } label: {
-                    Label("Open folder", systemImage: tokens.icon("icon.action.openFolder"))
-                }
-                .buttonStyle(SpyreButtonStyle(kind: .quiet))
-                .transition(.opacity)
-            } else if !compact, let note {
-                Text(note.text)
-                    .font(tokens.font("reason"))
-                    .foregroundStyle(tokens.color(note.color))
-                    .lineLimit(1)
-            }
-            Text(RelativeTime.short(from: session.lastActivity, to: now))
-                .font(tokens.font("label").monospacedDigit())
-                .foregroundStyle(tokens.color("color.text.secondary"))
-                .frame(minWidth: tokens.value("size.row.height"), alignment: .trailing)
-        }
-        .fixedSize()
-    }
-
-    /// The text before the time: the waiting reason, the no-activity flag, or a status the group does not say.
-    private var note: (text: String, color: String)? {
-        if let waiting = session.waitingText { return (waiting, "color.status.waiting") }
-        if session.hasNoActivityFlag(now: now, config: model.config) {
-            return ("No activity", "color.flag.noActivity")
-        }
-        if session.status == .starting || session.status.group != group {
-            return (session.status.title, "color.status.\(session.status.tokenName)")
-        }
-        return nil
-    }
-
-    private func accessibilityText(_ text: SessionRowText) -> String {
-        var parts = [text.title, session.waitingText.map { "Needs you, \($0)" } ?? session.status.title, text.detail]
-        parts += text.tags
-        parts.append("last activity \(RelativeTime.short(from: session.lastActivity, to: now)) ago")
-        return parts.joined(separator: ", ")
     }
 }

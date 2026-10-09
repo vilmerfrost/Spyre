@@ -51,6 +51,8 @@ final class AppModel {
     var expandedGroups: Set<StatusGroup> = []
     /// `true` when the user opened "Earlier" in the Idle group. In memory only, for this app run.
     var earlierExpanded = false
+    /// The row whose detail line is open. It shows as selected. In memory only.
+    var selectedSessionID: String?
     private var appearanceObservation: NSKeyValueObservation?
     /// Decides when the first-run screen shows. `SPEC.md` 4.8.
     private let welcome: WelcomePresenter
@@ -170,6 +172,28 @@ final class AppModel {
     /// "Quit Spyre" in the menubar window.
     func quit() {
         NSApp.terminate(nil)
+    }
+
+    /// "Show app": activates the app that hosts the session, else shows its folder. `SPEC.md` 4.3.
+    /// Spyre only brings an app to the front. It never types into it.
+    func showApp(_ session: SessionRecord) {
+        switch ShowAppResolver.resolve(session, tree: SystemProcessTree()) {
+        case .activate(let pid): NSRunningApplication(processIdentifier: pid)?.activate()
+        case .openURL(let text): if let url = URL(string: text) { NSWorkspace.shared.open(url) }
+        case .openFolder(let path): openFolder(path)
+        case .none: break
+        }
+    }
+
+    /// Opens or closes a row's detail line. One row at a time.
+    func toggleDetail(_ session: SessionRecord) {
+        selectedSessionID = selectedSessionID == session.id ? nil : session.id
+    }
+
+    /// Copies text (a path or a session ID) to the pasteboard.
+    func copy(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
     }
 
     /// Opens a session's working directory in Finder. Read-only: it only shows the folder. `SPEC.md` 4.3.

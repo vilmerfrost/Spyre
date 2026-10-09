@@ -40,6 +40,41 @@ public enum AgentType: String, Sendable, Codable {
     case codex
 }
 
+/// The app or mode that hosts a session. The detail line calls it "Host".
+public enum SessionHost: String, Sendable, Codable, CaseIterable {
+    /// Claude Code in a terminal (`entrypoint` `cli`).
+    case cli
+    /// Claude Code inside the Claude desktop app (`entrypoint` `claude-desktop`).
+    case desktop
+    /// Claude Code inside VS Code (`entrypoint` `claude-vscode`).
+    case vscode
+    /// The Codex terminal UI.
+    case codex
+    /// A `codex exec` run.
+    case exec
+
+    /// The Claude Code registry `entrypoint` value. `nil` for an unknown or missing value.
+    public init?(claudeEntrypoint: String?) {
+        switch claudeEntrypoint {
+        case "cli": self = .cli
+        case "claude-desktop": self = .desktop
+        case "claude-vscode": self = .vscode
+        default: return nil
+        }
+    }
+
+    /// The text the detail line shows.
+    public var title: String {
+        switch self {
+        case .cli: "CLI"
+        case .desktop: "Desktop"
+        case .vscode: "VS Code"
+        case .codex: "Codex"
+        case .exec: "exec"
+        }
+    }
+}
+
 /// How a session was started. `SPEC.md` 6.3 defines both kinds.
 public enum SessionKind: String, Sendable, Codable {
     /// Started outside Spyre. Always read-only.
@@ -68,6 +103,15 @@ public struct SessionRecord: Sendable, Identifiable, Equatable {
     public var isChildSession: Bool
     /// A short mode label for the row, for example `exec` for a `codex exec` run. `nil` for an interactive session.
     public var label: String?
+    /// The agent process, when known: the Claude Code registry `pid`, a child process, or the Codex TUI.
+    /// "Show app" walks its parent chain (`SPEC.md` 4.3).
+    public var processID: Int32?
+    /// The app or mode that hosts the session, when known. The detail line shows it as "Host".
+    public var host: SessionHost?
+    /// When the session started: registry `startedAt` (Claude Code), thread `created_at_ms` (Codex).
+    public var startedAt: Date?
+    /// The agent version that wrote the session. Codex `cli_version` only.
+    public var agentVersion: String?
 
     public init(
         id: String,
@@ -82,7 +126,11 @@ public struct SessionRecord: Sendable, Identifiable, Equatable {
         parentID: String? = nil,
         isStale: Bool = false,
         isChildSession: Bool = false,
-        label: String? = nil
+        label: String? = nil,
+        processID: Int32? = nil,
+        host: SessionHost? = nil,
+        startedAt: Date? = nil,
+        agentVersion: String? = nil
     ) {
         self.id = id
         self.agent = agent
@@ -97,6 +145,10 @@ public struct SessionRecord: Sendable, Identifiable, Equatable {
         self.isStale = isStale
         self.isChildSession = isChildSession
         self.label = label
+        self.processID = processID
+        self.host = host
+        self.startedAt = startedAt
+        self.agentVersion = agentVersion
     }
 
     /// The last path component of the working directory.

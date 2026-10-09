@@ -144,12 +144,28 @@ Child sessions show under their parent row. See 4.6.
 - A child whose parent is not in the list is its own top-level row, in its own status group.
 - The badge still counts every `waiting` session, also a nested child.
 
-### 4.3 Open a session's project
+### 4.3 Show a session's app or project
 
-- Hover a row to show "Open folder". The row's context menu has "Open Folder in Finder" too.
-  Both open the session's working directory in Finder (`NSWorkspace`). This only shows the folder. It changes nothing.
-- Later, not in the MVP: open the folder in the user's terminal app, picked in Settings (default: Terminal.app),
-  in a new window. Jump to the exact terminal tab is not planned.
+**Show app (in the MVP).** A click on a row, "Show app" on hover, and the context menu bring the app that hosts the
+session to the front. Spyre only activates the app. It never types into it and never sends it keystrokes.
+
+1. Spyre walks the parent process chain from the session's process (Claude Code registry `pid`, a child process, or
+   the Codex TUI) with `proc_pidinfo` (parent PID only). The first process that is a regular app (an `.app` bundle
+   with the regular activation policy, `NSRunningApplication`) is activated. For the Codex TUI this is its terminal app.
+2. Claude desktop rows (`entrypoint` `claude-desktop`) take the same walk, which reaches the Claude app.
+   The deep link `claude://code/continue?session=<id>` is UNVERIFIED and not used: a read-only look at the installed
+   app's handler showed it accepts only `last` or a desktop session ID (`local_…`), not the registry `sessionId`.
+3. When no app is found (for example tmux, or a missing process), Spyre opens the folder in Finder.
+
+Spyre never reads another process's environment or arguments for this. The exact terminal tab is out of scope.
+
+**Open folder.** Hover a row to show "Open folder". The context menu has "Open folder in Finder" and "Copy path".
+Both open or copy the session's working directory. This changes nothing.
+
+**Detail line.** "Show details" (the chevron, or the context menu) opens one line of label and value pairs under the
+row: Path (full), Started (registry `startedAt`; Codex `created_at_ms`), Host (CLI, Desktop, VS Code, Codex, exec),
+Waiting reason (waiting rows only), Session ID (last 8 characters, with a copy button), and Agent version (Codex
+`cli_version` only). Never message content. The row with an open detail line is selected. One row at a time.
 
 ### 4.4 Status model
 
@@ -508,7 +524,7 @@ Rules for the process scan:
 
 - Path: `~/.codex/state_5.sqlite`, table `threads` (verified).
 - The `5` is a schema version. Find the file by pattern `state_*.sqlite`. Pick the highest number.
-- Useful columns: `id`, `rollout_path`, `cwd`, `git_branch`, `updated_at_ms`, `archived`, `cli_version`, `source`, `originator`, `title`.
+- Useful columns: `id`, `rollout_path`, `cwd`, `git_branch`, `updated_at_ms`, `archived`, `cli_version`, `source`, `originator`, `title`, and `created_at_ms` (else `created_at` in seconds) for the detail line.
 - `title` is the thread title. Codex can derive it from the first prompt. Spyre shows it as the row title (4.2), on this Mac only. Spyre never logs it, stores it, or sends it anywhere. An empty `title`, or a schema without the column, gives no title.
 - `source` and `originator` values seen with CLI 0.161.0 (verified):
 
@@ -717,7 +733,7 @@ Before Lab work starts:
 - No owned sessions.
 - No routing of tasks between agents.
 - No starting, stopping, or sending input to agents.
-- No jump to the exact terminal tab.
+- No jump to the exact terminal tab. (Row click "Show app" is in the MVP: it brings the host app to the front, 4.3.)
 - No Codex `waiting` status.
 - No system notifications.
 - No network calls of any kind.

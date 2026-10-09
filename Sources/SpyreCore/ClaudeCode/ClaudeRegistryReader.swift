@@ -10,6 +10,8 @@ struct ClaudeRegistryEntry: Decodable, Sendable, Equatable {
     var startedAt: Double?
     var procStart: String?
     var version: String?
+    /// `cli`, `claude-desktop`, or `claude-vscode`. The host app hint.
+    var entrypoint: String?
     var status: String?
     var waitingFor: String?
     var updatedAt: Double?
