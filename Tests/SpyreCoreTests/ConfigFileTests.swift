@@ -85,8 +85,9 @@ struct ConfigFileTests {
         #expect(await results.next()?.config == .default)
         // `.atomic` writes a temp file and renames it over the old one, like most editors.
         try Data(#"{"alertDelay":11}"#.utf8).write(to: folder.appendingPathComponent("config.json"), options: .atomic)
+        // `next()` gives `nil` after a time-limit cancel. Stop then, so the test fails instead of spinning.
         var latest = await results.next()
-        while latest?.config.alertDelay != 11 { latest = await results.next() }
+        while let result = latest, result.config.alertDelay != 11 { latest = await results.next() }
         #expect(latest?.config.alertDelay == 11)
         withExtendedLifetime(watcher) {}
     }

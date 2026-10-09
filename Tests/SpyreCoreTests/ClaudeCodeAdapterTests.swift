@@ -64,187 +64,191 @@ private struct Harness {
     func cleanUp() { try? FileManager.default.removeItem(at: root) }
 }
 
-@Test func claudeAdapterIsObserveOnly() throws {
-    let harness = try Harness(sessions: [])
-    defer { harness.cleanUp() }
-    #expect(harness.adapter.capabilities == .observe)
-    #expect(harness.adapter.agent == .claudeCode)
-}
+@Suite(.timeLimit(.minutes(1)))
+struct ClaudeCodeAdapterTests {
+    @Test func claudeAdapterIsObserveOnly() throws {
+        let harness = try Harness(sessions: [])
+        defer { harness.cleanUp() }
+        #expect(harness.adapter.capabilities == .observe)
+        #expect(harness.adapter.agent == .claudeCode)
+    }
 
-@Test func validRegistryFilesMapStatus() async throws {
-    let harness = try Harness(sessions: ["101.json", "101.0000000000000000.key", "102.json", "106.json"])
-    defer { harness.cleanUp() }
-    harness.processes.set([claude(101), claude(102), claude(106)])
+    @Test func validRegistryFilesMapStatus() async throws {
+        let harness = try Harness(sessions: ["101.json", "101.0000000000000000.key", "102.json", "106.json"])
+        defer { harness.cleanUp() }
+        harness.processes.set([claude(101), claude(102), claude(106)])
 
-    let snapshot = await harness.adapter.refresh()
-    let sessions = Dictionary(uniqueKeysWithValues: snapshot.sessions.map { ($0.id, $0) })
-    #expect(sessions.count == 3)
-    #expect(snapshot.diagnostics.isEmpty)
-    #expect(snapshot.formatVersions["claude.registry"] == "2.1.295")
+        let snapshot = await harness.adapter.refresh()
+        let sessions = Dictionary(uniqueKeysWithValues: snapshot.sessions.map { ($0.id, $0) })
+        #expect(sessions.count == 3)
+        #expect(snapshot.diagnostics.isEmpty)
+        #expect(snapshot.formatVersions["claude.registry"] == "2.1.295")
 
-    let busy = try #require(sessions["\(uuid)101"])
-    #expect(busy.status == .working)
-    #expect(busy.workingDirectory == "/Users/you/Projects/app")
-    #expect(busy.branch == "feat/login")
-    #expect(busy.lastActivity == t0.addingTimeInterval(90.5))
-    #expect(busy.kind == .observed && !busy.isChildSession)
+        let busy = try #require(sessions["\(uuid)101"])
+        #expect(busy.status == .working)
+        #expect(busy.workingDirectory == "/Users/you/Projects/app")
+        #expect(busy.branch == "feat/login")
+        #expect(busy.lastActivity == t0.addingTimeInterval(90.5))
+        #expect(busy.kind == .observed && !busy.isChildSession)
 
-    let waiting = try #require(sessions["\(uuid)102"])
-    #expect(waiting.status == .waiting)
-    #expect(waiting.waitingReason == "permission prompt")
+        let waiting = try #require(sessions["\(uuid)102"])
+        #expect(waiting.status == .waiting)
+        #expect(waiting.waitingReason == "permission prompt")
 
-    #expect(sessions["\(uuid)106"]?.status == .unknown)
-}
+        #expect(sessions["\(uuid)106"]?.status == .unknown)
+    }
 
-@Test func missingStatusIsStartingThenUnknownAfterTimeout() async throws {
-    let harness = try Harness(sessions: ["103.json"])
-    defer { harness.cleanUp() }
-    harness.processes.set([claude(103)])
+    @Test func missingStatusIsStartingThenUnknownAfterTimeout() async throws {
+        let harness = try Harness(sessions: ["103.json"])
+        defer { harness.cleanUp() }
+        harness.processes.set([claude(103)])
 
-    let first = try #require(await harness.refresh()["\(uuid)103"])
-    #expect(first.status == .starting)
-    #expect(first.workingDirectory == "/Users/you/Projects/site")
-    harness.clock.advance(1.9)
-    #expect(await harness.refresh()["\(uuid)103"]?.status == .starting)
-    harness.clock.advance(0.1)
-    #expect(await harness.refresh()["\(uuid)103"]?.status == .unknown)
-}
+        let first = try #require(await harness.refresh()["\(uuid)103"])
+        #expect(first.status == .starting)
+        #expect(first.workingDirectory == "/Users/you/Projects/site")
+        harness.clock.advance(1.9)
+        #expect(await harness.refresh()["\(uuid)103"]?.status == .starting)
+        harness.clock.advance(0.1)
+        #expect(await harness.refresh()["\(uuid)103"]?.status == .unknown)
+    }
 
-@Test func truncatedNewFileIsStartingWithDiagnostic() async throws {
-    let harness = try Harness(sessions: ["104.json"])
-    defer { harness.cleanUp() }
-    harness.processes.set([claude(104)])
+    @Test func truncatedNewFileIsStartingWithDiagnostic() async throws {
+        let harness = try Harness(sessions: ["104.json"])
+        defer { harness.cleanUp() }
+        harness.processes.set([claude(104)])
 
-    let snapshot = await harness.adapter.refresh()
-    #expect(snapshot.sessions.map(\.id) == ["claude-pid-104"])
-    #expect(snapshot.sessions.first?.status == .starting)
-    #expect(snapshot.diagnostics.count == 1)
-}
+        let snapshot = await harness.adapter.refresh()
+        #expect(snapshot.sessions.map(\.id) == ["claude-pid-104"])
+        #expect(snapshot.sessions.first?.status == .starting)
+        #expect(snapshot.diagnostics.count == 1)
+    }
 
-@Test func badReadKeepsLastKnownState() async throws {
-    let harness = try Harness(sessions: ["102.json"])
-    defer { harness.cleanUp() }
-    harness.processes.set([claude(102)])
-    #expect(await harness.refresh()["\(uuid)102"]?.status == .waiting)
+    @Test func badReadKeepsLastKnownState() async throws {
+        let harness = try Harness(sessions: ["102.json"])
+        defer { harness.cleanUp() }
+        harness.processes.set([claude(102)])
+        #expect(await harness.refresh()["\(uuid)102"]?.status == .waiting)
 
-    let file = harness.session("102.json")
-    let full = try Data(contentsOf: file)
-    try full.prefix(60).write(to: file)
-    harness.clock.advance(5)
-    let afterPartial = try #require(await harness.refresh()["\(uuid)102"])
-    #expect(afterPartial.status == .waiting)
-    #expect(afterPartial.waitingReason == "permission prompt")
+        let file = harness.session("102.json")
+        let full = try Data(contentsOf: file)
+        try full.prefix(60).write(to: file)
+        harness.clock.advance(5)
+        let afterPartial = try #require(await harness.refresh()["\(uuid)102"])
+        #expect(afterPartial.status == .waiting)
+        #expect(afterPartial.waitingReason == "permission prompt")
 
-    try Data(#"{"pid":102,"sessionId":"\#(uuid)102"}"#.utf8).write(to: file)
-    #expect(await harness.refresh()["\(uuid)102"]?.status == .waiting)
+        try Data(#"{"pid":102,"sessionId":"\#(uuid)102"}"#.utf8).write(to: file)
+        #expect(await harness.refresh()["\(uuid)102"]?.status == .waiting)
 
-    try full.write(to: file)
-    #expect(await harness.refresh()["\(uuid)102"]?.status == .waiting)
-}
+        try full.write(to: file)
+        #expect(await harness.refresh()["\(uuid)102"]?.status == .waiting)
+    }
 
-@Test func deadProcessGivesDone() async throws {
-    let harness = try Harness(sessions: ["101.json", "105.json"])
-    defer { harness.cleanUp() }
-    harness.processes.set([claude(101)])
-    let first = await harness.refresh()
-    #expect(first["\(uuid)101"]?.status == .working)
-    #expect(first["\(uuid)105"]?.status == .done)
+    @Test func deadProcessGivesDone() async throws {
+        let harness = try Harness(sessions: ["101.json", "105.json"])
+        defer { harness.cleanUp() }
+        harness.processes.set([claude(101)])
+        let first = await harness.refresh()
+        #expect(first["\(uuid)101"]?.status == .working)
+        #expect(first["\(uuid)105"]?.status == .done)
 
-    harness.processes.set([])
-    let second = await harness.refresh()
-    #expect(second["\(uuid)101"]?.status == .done)
-    #expect(second["\(uuid)101"]?.waitingReason == nil)
-}
+        harness.processes.set([])
+        let second = await harness.refresh()
+        #expect(second["\(uuid)101"]?.status == .done)
+        #expect(second["\(uuid)101"]?.waitingReason == nil)
+    }
 
-@Test func deletedFileGivesDoneThenRowIsRemoved() async throws {
-    let harness = try Harness(sessions: ["101.json"])
-    defer { harness.cleanUp() }
-    harness.processes.set([claude(101)])
-    #expect(await harness.refresh()["\(uuid)101"]?.status == .working)
+    @Test func deletedFileGivesDoneThenRowIsRemoved() async throws {
+        let harness = try Harness(sessions: ["101.json"])
+        defer { harness.cleanUp() }
+        harness.processes.set([claude(101)])
+        #expect(await harness.refresh()["\(uuid)101"]?.status == .working)
 
-    try FileManager.default.removeItem(at: harness.session("101.json"))
-    #expect(await harness.refresh()["\(uuid)101"]?.status == .done)
-    harness.clock.advance(ClaudeCodeAdapter.doneRetention + 1)
-    #expect(await harness.refresh()["\(uuid)101"] == nil)
-}
+        try FileManager.default.removeItem(at: harness.session("101.json"))
+        #expect(await harness.refresh()["\(uuid)101"]?.status == .done)
+        harness.clock.advance(ClaudeCodeAdapter.doneRetention + 1)
+        #expect(await harness.refresh()["\(uuid)101"] == nil)
+    }
 
-@Test func reusedPIDGivesDone() async throws {
-    let harness = try Harness(sessions: ["101.json"])
-    defer { harness.cleanUp() }
-    harness.processes.set([claude(101, start: t0.addingTimeInterval(1))])
-    #expect(await harness.refresh()["\(uuid)101"]?.status == .working)
+    @Test func reusedPIDGivesDone() async throws {
+        let harness = try Harness(sessions: ["101.json"])
+        defer { harness.cleanUp() }
+        harness.processes.set([claude(101, start: t0.addingTimeInterval(1))])
+        #expect(await harness.refresh()["\(uuid)101"]?.status == .working)
 
-    harness.processes.set([claude(101, start: t0.addingTimeInterval(3_600))])
-    #expect(await harness.refresh()["\(uuid)101"]?.status == .done)
-}
+        harness.processes.set([claude(101, start: t0.addingTimeInterval(3_600))])
+        #expect(await harness.refresh()["\(uuid)101"]?.status == .done)
+    }
 
-@Test func pidReuseFallsBackToProcStart() {
-    let entry = ClaudeRegistryEntry(procStart: "Fri Jan 15 08:00:00 2027")
-    #expect(entry.procStartDate == t0)
-    #expect(!ClaudeCodeAdapter.isReused(entry, process: claude(1, start: t0)))
-    #expect(ClaudeCodeAdapter.isReused(entry, process: claude(1, start: t0.addingTimeInterval(60))))
-    #expect(!ClaudeCodeAdapter.isReused(ClaudeRegistryEntry(procStart: "12345"), process: claude(1, start: .now)))
-}
+    @Test func pidReuseFallsBackToProcStart() {
+        let entry = ClaudeRegistryEntry(procStart: "Fri Jan 15 08:00:00 2027")
+        #expect(entry.procStartDate == t0)
+        #expect(!ClaudeCodeAdapter.isReused(entry, process: claude(1, start: t0)))
+        #expect(ClaudeCodeAdapter.isReused(entry, process: claude(1, start: t0.addingTimeInterval(60))))
+        #expect(!ClaudeCodeAdapter.isReused(ClaudeRegistryEntry(procStart: "12345"), process: claude(1, start: .now)))
+    }
 
-@Test func childSessionFindsParentAndTranscriptStatus() async throws {
-    let harness = try Harness(sessions: ["101.json"])
-    defer { harness.cleanUp() }
-    let shell = ClaudeProcess(pid: 900, parentPID: 101, executablePath: "/bin/zsh")
-    harness.processes.set([claude(101), shell, claude(201, parent: 900)], cwds: [201: "/Users/you/Projects/app"])
+    @Test func childSessionFindsParentAndTranscriptStatus() async throws {
+        let harness = try Harness(sessions: ["101.json"])
+        defer { harness.cleanUp() }
+        let shell = ClaudeProcess(pid: 900, parentPID: 101, executablePath: "/bin/zsh")
+        harness.processes.set([claude(101), shell, claude(201, parent: 900)], cwds: [201: "/Users/you/Projects/app"])
 
-    let child = try #require(await harness.refresh()["claude-child-201"])
-    #expect(child.isChildSession)
-    #expect(child.parentID == "\(uuid)101")
-    #expect(child.status == .working)
-    #expect(child.branch == "main")
-    #expect(child.lastActivity == t0.addingTimeInterval(180))
-}
+        let child = try #require(await harness.refresh()["claude-child-201"])
+        #expect(child.isChildSession)
+        #expect(child.parentID == "\(uuid)101")
+        #expect(child.status == .working)
+        #expect(child.branch == "main")
+        #expect(child.lastActivity == t0.addingTimeInterval(180))
+    }
 
-@Test func childSessionWithoutParentUsesTurnEnd() async throws {
-    let harness = try Harness(sessions: [])
-    defer { harness.cleanUp() }
-    let vscode = "/Users/you/.vscode/extensions/anthropic.claude-code-2.1.295/resources/native-binary/claude"
-    harness.processes.set([claude(202, parent: 1, path: vscode)], cwds: [202: "/Users/you/Projects/docs"])
+    @Test func childSessionWithoutParentUsesTurnEnd() async throws {
+        let harness = try Harness(sessions: [])
+        defer { harness.cleanUp() }
+        let vscode = "/Users/you/.vscode/extensions/anthropic.claude-code-2.1.295/resources/native-binary/claude"
+        harness.processes.set([claude(202, parent: 1, path: vscode)], cwds: [202: "/Users/you/Projects/docs"])
 
-    let child = try #require(await harness.refresh()["claude-child-202"])
-    #expect(child.isChildSession && child.parentID == nil)
-    #expect(child.status == .idle)
-    #expect(child.branch == "docs/readme")
-}
+        let child = try #require(await harness.refresh()["claude-child-202"])
+        #expect(child.isChildSession && child.parentID == nil)
+        #expect(child.status == .idle)
+        #expect(child.branch == "docs/readme")
+    }
 
-@Test func unreadableChildIsUnknownThenDone() async throws {
-    let harness = try Harness(sessions: [])
-    defer { harness.cleanUp() }
-    harness.processes.set([claude(203), ClaudeProcess(pid: 204, parentPID: 1, executablePath: "/usr/bin/node")])
+    @Test func unreadableChildIsUnknownThenDone() async throws {
+        let harness = try Harness(sessions: [])
+        defer { harness.cleanUp() }
+        harness.processes.set([claude(203), ClaudeProcess(pid: 204, parentPID: 1, executablePath: "/usr/bin/node")])
 
-    let snapshot = await harness.adapter.refresh()
-    #expect(snapshot.sessions.map(\.id) == ["claude-child-203"])
-    #expect(snapshot.sessions.first?.status == .unknown)
-    #expect(snapshot.diagnostics.count == 1)
+        let snapshot = await harness.adapter.refresh()
+        #expect(snapshot.sessions.map(\.id) == ["claude-child-203"])
+        #expect(snapshot.sessions.first?.status == .unknown)
+        #expect(snapshot.diagnostics.count == 1)
 
-    harness.processes.set([])
-    #expect(await harness.refresh()["claude-child-203"]?.status == .done)
-}
+        harness.processes.set([])
+        #expect(await harness.refresh()["claude-child-203"]?.status == .done)
+    }
 
-@Test func childCandidateWithoutTranscriptIsNotShown() async throws {
-    let harness = try Harness(sessions: [])
-    defer { harness.cleanUp() }
-    harness.processes.set([claude(205, parent: 1)], cwds: [205: "/Users/you/Projects/empty"])
+    @Test func childCandidateWithoutTranscriptIsNotShown() async throws {
+        let harness = try Harness(sessions: [])
+        defer { harness.cleanUp() }
+        harness.processes.set([claude(205, parent: 1)], cwds: [205: "/Users/you/Projects/empty"])
 
-    let snapshot = await harness.adapter.refresh()
-    #expect(snapshot.sessions.isEmpty)
-    #expect(snapshot.diagnostics.count == 1)
-}
+        let snapshot = await harness.adapter.refresh()
+        #expect(snapshot.sessions.isEmpty)
+        #expect(snapshot.diagnostics.count == 1)
+    }
 
-@Test func claudeExecutableMatchesByPath() {
-    let desktop = "/Users/you/Library/Application Support/Claude/claude-code/2.1.295/x/claude.app/Contents/MacOS/claude"
-    let match = [cliPath, desktop]
-    let noMatch = ["/usr/bin/node", "/Users/you/.local/share/claude/versions/", "/bin/claude-helper", "/bin/zsh"]
-    for path in match { #expect(ClaudeProcess(pid: 1, parentPID: 0, executablePath: path).isClaudeCode) }
-    for path in noMatch { #expect(!ClaudeProcess(pid: 1, parentPID: 0, executablePath: path).isClaudeCode) }
-}
+    @Test func claudeExecutableMatchesByPath() {
+        let desktop = "/Users/you/Library/Application Support/Claude/claude-code/2.1.295/x/"
+            + "claude.app/Contents/MacOS/claude"
+        let match = [cliPath, desktop]
+        let noMatch = ["/usr/bin/node", "/Users/you/.local/share/claude/versions/", "/bin/claude-helper", "/bin/zsh"]
+        for path in match { #expect(ClaudeProcess(pid: 1, parentPID: 0, executablePath: path).isClaudeCode) }
+        for path in noMatch { #expect(!ClaudeProcess(pid: 1, parentPID: 0, executablePath: path).isClaudeCode) }
+    }
 
-@Test func transcriptFolderNameEncodesCwd() {
-    #expect(ClaudeTranscriptReader.encodedFolderName(for: "/Users/you/Projects/app") == "-Users-you-Projects-app")
-    #expect(ClaudeTranscriptReader.encodedFolderName(for: "/Users/you/.config/x_y") == "-Users-you--config-x-y")
+    @Test func transcriptFolderNameEncodesCwd() {
+        #expect(ClaudeTranscriptReader.encodedFolderName(for: "/Users/you/Projects/app") == "-Users-you-Projects-app")
+        #expect(ClaudeTranscriptReader.encodedFolderName(for: "/Users/you/.config/x_y") == "-Users-you--config-x-y")
+    }
 }

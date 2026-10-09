@@ -23,14 +23,24 @@ public final class ConfigWatcher: @unchecked Sendable {
         fileSource?.cancel()
     }
 
+    /// Watches before it reads, so a change after the read always fires an event.
+    /// On first launch `load()` creates the folder and file. Then it watches and reads again.
     private func reload() {
         reloadPending = false
-        onChange(file.load())
+        let watching = watch()
+        var result = file.load()
+        if !watching, watch() { result = file.load() }
+        onChange(result)
+    }
+
+    /// Watches the folder and the current file. Returns `true` when both are watched.
+    private func watch() -> Bool {
         if folderSource == nil {
             folderSource = makeSource(file.folder.path, events: .write)
         }
         fileSource?.cancel()
         fileSource = makeSource(file.url.path, events: [.write, .extend, .delete, .rename])
+        return folderSource != nil && fileSource != nil
     }
 
     /// Coalesces bursts of events (an editor save can fire several) into one reload.
