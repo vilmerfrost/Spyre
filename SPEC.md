@@ -44,7 +44,7 @@ It never starts, stops, or changes an agent session.
 |---------|---------|--------|
 | Menubar item | Spyre icon, a badge, and a short session list. | Yes |
 | Main window | A section switcher: Radar, Grab, Lab. Grab and Lab show "Coming soon". | Yes |
-| Dock | A vertical strip on one screen edge. One icon per live session. | Yes. The user can hide it. |
+| Dock | A vertical strip on one screen edge. One icon per live session. | No. Planned for v0.2. Default: hidden. |
 
 `DESIGN.md` defines the look of all surfaces.
 
@@ -62,9 +62,9 @@ A `waiting` state can last less than 2 s.
 For example, a user hook can approve a permission prompt automatically (verified: about 2 s).
 Spyre must never assume that a `waiting` state stays.
 
-- Attention effects start only when a session stays `waiting` for longer than the waiting grace time (default: 3 s).
-- Attention effects are the pulse on the dock icon and, later, system notifications.
-- The badge and the list do not use the grace time. They always show the current state.
+- Attention effects start only when a session stays `waiting` for longer than the alert delay (3 s).
+- Attention effects are the pulse on the dock icon (v0.2) and system notifications (later). The MVP has no attention effects. The alert delay is defined now so that v0.2 uses the same value.
+- The badge and the list do not use the alert delay. They always show the current state.
 
 ### 4.2 Session list
 
@@ -80,9 +80,19 @@ Each row shows:
 | Last activity | Relative time, for example "2 min ago" |
 | No-activity flag | See 4.4. Only on `working` rows. |
 
-Sort order: `waiting`, `working`, `idle`, `unknown`, `done`.
-Inside `working`, rows with the no-activity flag come first.
-Inside each status, the newest last activity comes first.
+Group the rows by status. Show the groups in this order, each with a header:
+
+1. Waiting
+2. Working
+3. Idle
+4. Unknown (shown only when it has rows)
+5. Done
+
+- Inside `Working`, rows with the no-activity flag come first.
+- Inside each group, the newest last activity comes first.
+- Hide a group header when the group is empty.
+- Freeze the row order while the pointer is over the list. Rows must not move under the pointer. Status text and badges still update. Apply the new order when the pointer leaves the list.
+- Reason: rows that jump under the pointer cause wrong clicks. Another session monitor removed status sorting for this reason (`research/competitors.md`).
 
 Child sessions show under their parent row. See 4.6.
 
@@ -107,27 +117,58 @@ Remove `done` rows from the list after 10 minutes.
 
 **No-activity flag.**
 The status `stuck` does not exist.
-A `working` session with no activity for longer than a threshold (default: 10 min) gets the no-activity flag.
+A `working` session with no activity for longer than the no-activity threshold (10 min) gets the no-activity flag.
 
 - The flag is a visual mark on the row, for example "No activity for 12 min". It is not a status.
 - The flag does not count in the badge.
 - The flag goes away on the next activity.
 - Reason: "no activity" is a guess. A long build or test run is still `working`. A status must come from a source fact.
 
+**Stale mark.**
+When an adapter refresh times out (6.4), its sessions keep their last state. Each of these rows gets a "stale" mark until the next successful refresh.
+The stale mark is not a status. It does not change the badge count.
+
+**Config values.**
+Spyre stores these values in its config, not in code:
+
+| Key | Value | Used by |
+|-----|-------|---------|
+| `alertDelay` | 3 s | Attention effects (4.1) |
+| `noActivityThreshold` | 10 min | No-activity flag (4.4) |
+| `adapterRefreshTimeout` | 2 s | Stale mark (4.4, 6.4) |
+
+The MVP has no settings UI for these values.
+
 ### 4.5 Status sources
 
 **Claude Code**
 
-1. **Session registry (main source).** Spyre reads `~/.claude/sessions/<pid>.json`. It gives liveness, `working`, `waiting`, and `idle`. The MVP needs no hook setup.
-2. **Spyre hook (optional backup).** The user can add a hook snippet to their Claude Code settings by hand. The hook writes a status file into Spyre's own folder.
+The sources are layered.
+
+1. **Session registry (default).** Spyre reads `~/.claude/sessions/<pid>.json`. It gives liveness, `working`, `waiting`, and `idle`. No setup is needed.
+2. **`PermissionRequest` hook (optional).** It gives an instant `waiting` when a permission dialog opens. The user adds it from a snippet that Spyre shows. See 5.1 B.
 3. **Transcript.** Gives git branch and a fallback for last activity.
 4. **Process scan.** Gives liveness for sessions without a registry file. See 4.6.
 
-Merge rule for one session:
+**Registry gaps.**
+The registry file is not always complete:
 
-- When the registry file exists and parses, its status wins.
-- Spyre uses the hook status only when the registry has no file for the session, or gives `unknown`.
-- Reason: the registry changes faster than the hook `Notification` event (5.1 B).
+- A new file has no `status` for about 500 ms (`research/competitors.md`).
+- Claude Code does not write the file atomically. A read can see a partial file.
+
+The registry reader must tolerate these gaps:
+
+- A bad read is a read that fails to parse, or has no `status`.
+- On a bad read, keep the last known state for that session. Retry on the next file event, or after 250 ms, whichever comes first.
+- A new session with no good read yet does not show a status. Show the row with the label "Starting…". If there is still no good read after `adapterRefreshTimeout`, show `unknown`.
+- Never show a state that no source reported.
+
+**Merge rule.**
+When both sources have a state for the same session, the hook wins.
+Two limits keep the hook from showing a false state:
+
+- A hook state is valid only until the registry writes a newer `statusUpdatedAt`. Example: the user approves the prompt, and the registry changes to `busy`. The hook `waiting` is then cleared.
+- A dead process or a deleted registry file always gives `done`. A hook state never keeps an ended session alive.
 
 Spyre never edits `~/.claude/settings.json`.
 Spyre shows the hook snippet in Settings with a "Copy" button.
@@ -152,19 +193,19 @@ Spyre finds child sessions this way:
 3. Spyre finds the newest transcript file in `~/.claude/projects/<encoded-cwd>/` whose `sessionId` is not in any registry file. This gives last activity and git branch.
 4. Spyre walks the parent process chain (parent PID, then its parent PID). The first process that has a registry file is the parent session.
 5. Spyre shows the child row under the parent row, with the label "child session".
-6. When no parent is found, Spyre shows the child as a top-level row.
+6. When no parent is found, Spyre shows the child as its own top-level row, with the label "child, no parent".
 
 Status of a child session:
 
-- The registry has no status for it. Without the hook, the status is `unknown` while the process lives, and `done` when it ends.
-- With the Spyre hook installed, the hook status is used.
+- The registry has no status for it.
+- When the `PermissionRequest` hook is installed and fires for the child, the hook gives `waiting`.
+- Otherwise the transcript tail gives the status: a record newer than the last turn end gives `working`, a turn end gives `idle`. The first code PR for child sessions must verify this method.
+- The process ending gives `done`.
+- Spyre shows `unknown` only when the child's data cannot be read.
 
-UNKNOWN:
+Known limit: when two child sessions share a folder, Spyre cannot always match each process to its transcript. Same limit as Codex.
 
-- The exact process name of a Claude Code process on every host (CLI, desktop, VS Code).
-- Whether the parent process chain always reaches the parent session. A host app or daemon may sit in between.
-- Whether hooks fire in a child session.
-- How to match a child process to its transcript when two child sessions share a folder. Same limit as Codex.
+See section 11 for the open UNKNOWNs about child sessions.
 
 Spyre never reads the environment variables of another process. They can hold secrets.
 
@@ -228,9 +269,20 @@ Mapping:
 | any other value | `unknown` |
 | PID dead or file gone | `done` |
 
-**B. Hook payloads (optional Spyre hook)**
+**B. Hooks (optional)**
 
-Real `Notification` payloads (verified, values faked):
+The optional Spyre hook uses the `PermissionRequest` event.
+It fires when the permission dialog opens (`research/competitors.md`). The `Notification` event comes later (see timing below).
+
+Rules for the hook snippet:
+
+- The hook must print nothing to stdout. Claude Code can read hook output as an answer to the prompt. A status hook must never approve or deny.
+- The hook must exit with code 0 and finish fast.
+- The hook writes `~/Library/Application Support/Spyre/status/<session_id>.json`. The file holds `session_id`, `cwd`, `event`, and a timestamp. Nothing else.
+- The hook never writes inside `~/.claude/`.
+- Spyre shows the snippet with a "Copy" button. The user adds it to their settings by hand. Spyre never edits a settings file.
+
+Real `Notification` payloads (verified, values faked). They are kept here as format evidence:
 
 ```json
 {
@@ -251,23 +303,16 @@ Timing (verified):
 
 - The `permission_prompt` notification is delayed. It did not fire when the prompt was closed after 4 s. It fired when the prompt stayed open for 30 s.
 - The `idle_prompt` notification fired in 1 of 2 runs within about 2 min of idle. Do not use it as the "finished" signal.
-- The registry changes faster than the notification. This is why the registry is the main source and the hook is only a backup.
+- The registry changes faster than the notification. This is why the optional hook uses `PermissionRequest`, not `Notification`.
 
-Hook events for the Spyre hook:
+Hook event used in the MVP:
 
 | Event | Spyre status |
 |-------|--------------|
-| `UserPromptSubmit` | `working` |
-| `Notification` with `notification_type: "permission_prompt"` | `waiting` |
-| `Notification` with `notification_type: "elicitation_dialog"` | `waiting` (inferred; not observed) |
-| `Stop` | `idle` |
-| `StopFailure` | `idle` |
-| `SessionEnd` | `done` |
+| `PermissionRequest` | `waiting` |
 
-The hook writes `~/Library/Application Support/Spyre/status/<session_id>.json`.
-The file holds `session_id`, `cwd`, `event`, `notification_type`, and a timestamp. Nothing else.
-The hook never writes inside `~/.claude/`.
-A `PermissionRequest` hook from another tool can answer a prompt in about 2 s (verified). The `Stop` or `UserPromptSubmit` event then moves the status on.
+All other states come from the registry.
+A `PermissionRequest` hook from another tool can answer a prompt in about 2 s (verified). The registry then writes a newer status, and the merge rule (4.5) clears the hook state.
 
 **C. Transcript (secondary)**
 
@@ -412,7 +457,7 @@ This is the contract in plain language. The code protocol must follow it.
 - Refresh runs off the main actor.
 - Session records and diagnostics are `Sendable` values.
 - The app calls refresh for one adapter one at a time. Adapters can refresh in parallel with each other.
-- A refresh that takes longer than 2 s counts as failed. The app keeps the last snapshot and logs a warning.
+- A refresh that takes longer than `adapterRefreshTimeout` (2 s) counts as timed out. The app keeps the last snapshot, marks its rows "stale" (4.4), and logs a warning.
 
 **An adapter must never**
 
@@ -445,7 +490,12 @@ The user picks a task and two or more skills or agents. Spyre runs them and show
 Lab must start and run agents.
 This conflicts with the MVP observe-only rule.
 Lab will use owned sessions only (6.3), started through an official agent SDK or API.
-A human must approve this rule change before Lab work starts.
+
+Before Lab work starts:
+
+- Lab needs its own design doc. That doc defines how Spyre starts, limits, and stops agents.
+- A human must approve the change to the observe-only rule.
+- Spyre must get explicit user opt-in before it starts any agent. Opt-in is off by default.
 
 ## 8. Distribution
 
@@ -457,6 +507,8 @@ A human must approve this rule change before Lab work starts.
 ## 9. Non-goals for MVP
 
 - No Grab and no Lab sections. They show "Coming soon".
+- No dock. Planned for v0.2.
+- No settings UI for config values (4.4).
 - No owned sessions.
 - No routing of tasks between agents.
 - No starting, stopping, or sending input to agents.
@@ -481,10 +533,17 @@ A human must approve this rule change before Lab work starts.
 
 ## 11. Open questions
 
-1. Is the no-activity threshold of 10 minutes right? Should the user set it?
-2. How stable are these formats across versions? We need fixture files per version in tests.
-3. How does Spyre show a Codex desktop thread more reliably than "ChatGPT runs and recent update"?
-4. Which `waitingFor` value does Claude Code write for a question (`AskUserQuestion`) or an MCP elicitation?
-5. When should the `elicitation_dialog` notification fire? It was not observed.
-6. Is a waiting grace time of 3 s right for attention effects?
-7. Child sessions: see the UNKNOWN list in 4.6.
+1. How stable are these formats across versions? We need fixture files per version in tests.
+2. How does Spyre show a Codex desktop thread more reliably than "ChatGPT runs and recent update"?
+
+**Resolve in the first code PR**
+
+- UNKNOWN: the process name of a Claude Code process on each host (CLI, desktop, VS Code). The process scan (4.6) needs it.
+
+**Later**
+
+These UNKNOWNs do not block the MVP.
+
+- UNKNOWN: in a Codex hook, is `$PPID` the TUI process or the shared app-server daemon?
+- UNKNOWN: do hooks fire in a child session? Does the parent process chain always reach the parent session, or can a host app or daemon sit in between?
+- UNKNOWN: when does the `elicitation_dialog` notification fire? Which `waitingFor` value does the registry write for a question (`AskUserQuestion`) or an MCP elicitation?

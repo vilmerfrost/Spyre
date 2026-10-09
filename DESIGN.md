@@ -1,7 +1,7 @@
 # Spyre Design System
 
 Status: draft for MVP.
-Read `SPEC.md` first. It defines the surfaces: menubar item, main window, and dock.
+Read `SPEC.md` first. It defines the surfaces: menubar item and main window in the MVP, and the dock in v0.2.
 
 ## 1. Principle
 
@@ -26,7 +26,12 @@ The default themes are calm and clean.
 - Use status colors only for status. Do not use them for decoration.
 - Keep motion short and fast. The user must never wait for an animation.
 
-### 2.1 Dock
+This default look stays for the MVP. It respects macOS "Reduce Transparency" (10.2).
+
+### 2.1 Dock (v0.2)
+
+The dock is not in the MVP. It is planned for v0.2.
+The MVP defines the dock tokens now, so that themes stay valid in v0.2.
 
 The dock is a vertical strip on one screen edge.
 
@@ -36,7 +41,7 @@ The dock is a vertical strip on one screen edge.
 - When there are more sessions than the dock can show, the last slot shows "+N".
 - Click an icon to open the session's project (`SPEC.md` 4.3).
 - Hover an icon to show a tooltip with project name and status label.
-- Position: left, right, or hidden. Default: right.
+- Position: left, right, or hidden. Default: hidden.
 
 ### 2.2 Cards
 
@@ -143,7 +148,6 @@ The dark and high-contrast themes set their own values.
 | `motion.duration.normal` | `0.22` | Card and row changes |
 | `motion.duration.ring` | `1.6` | One turn of the working ring |
 | `motion.duration.pulse` | `1.2` | One waiting pulse |
-| `motion.waitingGrace` | `3.0` | Seconds before attention effects start (`SPEC.md` 4.1) |
 
 ### 5.4 Status icons
 
@@ -169,7 +173,7 @@ The ring also has a different shape per status (6.2).
 | Status | Ring |
 |--------|------|
 | `working` | Partial arc that turns |
-| `waiting` | Full ring. Pulses after `motion.waitingGrace`. |
+| `waiting` | Full ring. Pulses after the `alertDelay` config value (`SPEC.md` 4.4). |
 | `idle` | Thin full ring |
 | `done` | Full ring with a check mark badge |
 | `unknown` | Dashed ring |
@@ -225,10 +229,11 @@ Spyre builds the active token set in this order. A later layer wins.
   - gradient: `color.background.gradientTop` to `color.background.gradientBottom`,
   - wallpaper blur: the desktop wallpaper behind the window, blurred by `blur.wallpaper`.
 - Density: comfortable or compact.
-- Dock position: left, right, or hidden.
 - Theme JSON import.
 
 Later, not in MVP:
+
+- Dock position: left, right, or hidden (v0.2, with the dock).
 
 - A full theme editor.
 - Community theme sharing.
@@ -239,13 +244,13 @@ Theme import must never crash Spyre and must never use the network.
 
 1. Read only a local file the user picks. Reject files larger than 64 KB.
 2. Reject the file if it is not valid JSON, or if `spyreTheme` is missing or newer than Spyre supports.
-3. Ignore unknown token names. List them in the import report. Reason: a newer Spyre version can add tokens.
+3. Ignore unknown token names. Show a warning that lists them. Reason: a newer Spyre version can add tokens.
 4. Check the type of each value. A value with the wrong type is dropped. The default value is used.
 5. Clamp numbers to a safe range. Examples: opacity 0.0 to 1.0, radius 0 to 40, `font.body.size` 10 to 24, motion durations 0 to 2 s.
 6. Accept colors only in `#RRGGBB` or `#RRGGBBAA` form.
 7. Accept `font.family` only when the font is installed. Otherwise use `system`.
 8. A theme holds no URLs and no file paths. Reject any string value that contains a URL scheme such as `http:`, `https:`, or `file:`.
-9. Check text contrast (section 10). Show the result in the import report.
+9. Check text contrast (section 10). Show a warning for each failing text pair.
 10. Spyre copies the accepted values into its own folder. It never reads the source file again.
 
 ## 10. Accessibility
@@ -255,7 +260,7 @@ Theme import must never crash Spyre and must never use the network.
 - Every built-in theme meets WCAG AA: 4.5:1 for body text, 3:1 for large text and for status icons and rings.
 - A test checks every built-in theme.
 - Check contrast against the card color composed over the background. For wallpaper blur, set `opacity.card` to at least 0.85. The wallpaper color is not known.
-- Imported themes: Spyre shows a warning for each failing text pair. The user must confirm "Use anyway". Spyre does not change the colors.
+- Imported themes: a theme that fails AA still loads. Spyre shows a warning for each failing text pair. Spyre does not change the colors. The user can switch back to a built-in theme at any time.
 
 ### 10.2 Reduce Transparency
 

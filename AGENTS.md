@@ -107,6 +107,10 @@ A task is done only when all items are true:
 8. The commit messages follow Conventional Commits.
 9. The PR is open against `main`, with a description of tests run and not run.
 
+## When you are blocked
+
+- If a guard, permission, or hook blocks you, stop and report. Never work around it.
+
 ## When you are not sure
 
 - Mark facts you did not verify as UNKNOWN. Do not guess file formats.
