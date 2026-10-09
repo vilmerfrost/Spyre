@@ -1,7 +1,7 @@
 import Foundation
 
-/// An adapter that returns fixed sessions. For tests, previews, and the scaffold UI only.
-/// All paths and IDs are fake.
+/// An adapter that returns fixed sessions. For tests and the hidden `-SpyreDemo` launch argument only.
+/// All paths, titles, and IDs are fake.
 public struct FakeAdapter: AgentAdapter {
     public let agent: AgentType = .claudeCode
     public let capabilities: AdapterCapabilities = .observe
@@ -19,12 +19,19 @@ public struct FakeAdapter: AgentAdapter {
         AsyncStream { $0.finish() }
     }
 
-    /// The fixed test sessions: two waiting, one working, one idle, one done, one unknown.
+    /// `true` when Spyre was launched with the hidden `-SpyreDemo` argument. Spyre then shows these fake
+    /// sessions instead of reading `~/.claude` and `~/.codex`. For visual checks without real data.
+    public static func isRequested(arguments: [String]) -> Bool {
+        arguments.contains("-SpyreDemo")
+    }
+
+    /// The fixed test sessions: two waiting, two working (one `codex exec`), one idle child, one done,
+    /// and one unknown.
     public static func sessions(now: Date) -> [SessionRecord] {
         [
             SessionRecord(
                 id: "fake-1", agent: .claudeCode, workingDirectory: "/Users/you/Projects/app",
-                branch: "main", status: .waiting, waitingReason: "permission prompt",
+                title: "Fix the login redirect", branch: "main", status: .waiting, waitingReason: "permission prompt",
                 lastActivity: now.addingTimeInterval(-20)
             ),
             SessionRecord(
@@ -33,11 +40,12 @@ public struct FakeAdapter: AgentAdapter {
             ),
             SessionRecord(
                 id: "fake-3", agent: .claudeCode, workingDirectory: "/Users/you/Projects/site",
-                branch: "fix/nav", status: .working, lastActivity: now.addingTimeInterval(-5)
+                title: "Tidy the navigation bar", branch: "fix/nav", status: .working,
+                lastActivity: now.addingTimeInterval(-5)
             ),
             SessionRecord(
                 id: "fake-4", agent: .claudeCode, workingDirectory: "/Users/you/Projects/app",
-                status: .idle, lastActivity: now.addingTimeInterval(-600), parentID: "fake-1"
+                status: .idle, lastActivity: now.addingTimeInterval(-600), parentID: "fake-1", isChildSession: true
             ),
             SessionRecord(
                 id: "fake-5", agent: .codex, workingDirectory: "/Users/you/Projects/cli",
@@ -46,6 +54,10 @@ public struct FakeAdapter: AgentAdapter {
             SessionRecord(
                 id: "fake-6", agent: .claudeCode, workingDirectory: "/Users/you/Projects/docs",
                 status: .unknown, lastActivity: now.addingTimeInterval(-40), isStale: true
+            ),
+            SessionRecord(
+                id: "fake-7", agent: .codex, workingDirectory: "/Users/you/Projects/tools", branch: "HEAD",
+                status: .working, lastActivity: now.addingTimeInterval(-12), label: "exec"
             ),
         ]
     }

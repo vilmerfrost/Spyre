@@ -87,9 +87,10 @@ Each row shows:
 
 | Field | Source |
 |-------|--------|
+| Title | The session title: Claude Code registry `name` (5.1 A), Codex `threads.title` (5.2 A). When it is missing or empty: the project name. When the folder is not known yet: the agent type. |
 | Agent type | `Claude Code` or `Codex` |
-| Project name | Last path component of the working directory |
-| Worktree / branch | Git branch. Show the worktree name if the directory is a git worktree. |
+| Project name | Last path component of the working directory. A session in the home folder shows `~`. |
+| Worktree / branch | Git branch. Show the worktree name if the directory is a git worktree. A detached `HEAD` shows no branch. |
 | Status | See 4.4 |
 | Last activity | Relative time, for example "2 min ago" |
 | No-activity flag | See 4.4. Only on `working` rows. |
@@ -369,7 +370,7 @@ Fields:
 | `procStart` | `Fri Oct  9 14:16:29 2026` | PID reuse check |
 | `kind` | `interactive` | Filter |
 | `entrypoint` | `cli`, `claude-desktop`, `claude-vscode` | Host app hint |
-| `name` | `Fix login bug` | Session title |
+| `name` | `Fix login bug` | Session title (the row title, 4.2). Shown locally only. |
 | `status` | `busy`, `waiting`, `idle` | Status |
 | `waitingFor` | `permission prompt` | Reason for `waiting`. Absent in other states. |
 | `updatedAt`, `statusUpdatedAt` | ms epoch | Last activity |
@@ -469,7 +470,8 @@ Rules for the process scan:
 
 - Path: `~/.codex/state_5.sqlite`, table `threads` (verified).
 - The `5` is a schema version. Find the file by pattern `state_*.sqlite`. Pick the highest number.
-- Useful columns: `id`, `rollout_path`, `cwd`, `git_branch`, `updated_at_ms`, `archived`, `cli_version`, `source`, `originator`. Spyre does not read `title`.
+- Useful columns: `id`, `rollout_path`, `cwd`, `git_branch`, `updated_at_ms`, `archived`, `cli_version`, `source`, `originator`, `title`.
+- `title` is the thread title. Codex can derive it from the first prompt. Spyre shows it as the row title (4.2), on this Mac only. Spyre never logs it, stores it, or sends it anywhere. An empty `title`, or a schema without the column, gives no title.
 - `source` and `originator` values seen with CLI 0.161.0 (verified):
 
 | Started by | `source` | `originator` |
@@ -693,6 +695,8 @@ Before Lab work starts:
 - Spyre never uploads anything.
 - Spyre has no network code and no network entitlement.
 - Spyre reads the minimum fields it needs. It does not store transcript content.
+- Session titles (Claude Code registry `name`, Codex `threads.title`) can contain words from a prompt.
+  Spyre shows them in its own windows only. It never logs them, writes them to disk, or sends them anywhere.
 - Spyre never reads credential files: `~/.claude/.credentials.json`, `~/.claude/sessions/*.key`, `~/.codex/auth.json`.
 - Spyre never reads the environment variables of another process.
 

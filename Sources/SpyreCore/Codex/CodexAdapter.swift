@@ -145,7 +145,8 @@ public actor CodexAdapter: AgentAdapter {
     private func record(_ thread: CodexThread, status: SessionStatus, lastActivity: Date) -> SessionRecord {
         let isExec = thread.source == Self.execSource
         return SessionRecord(
-            id: thread.id, agent: .codex, workingDirectory: thread.cwd, branch: thread.gitBranch,
+            id: thread.id, agent: .codex, workingDirectory: thread.cwd, title: thread.title,
+            branch: thread.gitBranch,
             status: Self.shownStatus(status, isExec: isExec), lastActivity: lastActivity,
             label: isExec ? "exec" : nil
         )

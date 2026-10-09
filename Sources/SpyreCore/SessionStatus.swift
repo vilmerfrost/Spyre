@@ -54,6 +54,9 @@ public struct SessionRecord: Sendable, Identifiable, Equatable {
     public var agent: AgentType
     public var kind: SessionKind
     public var workingDirectory: String
+    /// The session title, when the agent has one: the Claude Code registry `name` (`SPEC.md` 5.1 A) or the Codex
+    /// `threads.title` (5.2 A). Shown locally only. Never logged or stored.
+    public var title: String?
     public var branch: String?
     public var status: SessionStatus
     public var waitingReason: String?
@@ -71,6 +74,7 @@ public struct SessionRecord: Sendable, Identifiable, Equatable {
         agent: AgentType,
         kind: SessionKind = .observed,
         workingDirectory: String,
+        title: String? = nil,
         branch: String? = nil,
         status: SessionStatus,
         waitingReason: String? = nil,
@@ -84,6 +88,7 @@ public struct SessionRecord: Sendable, Identifiable, Equatable {
         self.agent = agent
         self.kind = kind
         self.workingDirectory = workingDirectory
+        self.title = title
         self.branch = branch
         self.status = status
         self.waitingReason = waitingReason

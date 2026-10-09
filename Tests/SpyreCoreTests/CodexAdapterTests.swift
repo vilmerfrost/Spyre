@@ -32,6 +32,7 @@ private struct Row {
     var archived = false
     var source = "vscode"
     var originator = "codex-tui"
+    var title = ""
     /// The writer version. It picks the fixture folder and fills `threads.cli_version`.
     var version = "0.161.0"
 }
@@ -56,8 +57,8 @@ private func makeRoot(_ rows: [Row], database: Bool = true) throws -> URL {
         let millis = Int64(row.updated.timeIntervalSince1970 * 1000)
         sql += """
             INSERT INTO threads (id, rollout_path, cwd, git_branch, updated_at_ms, archived, cli_version, source,
-            originator) VALUES ('\(row.id)', '\(rollout)', '\(row.cwd)', 'main', \(millis), \(row.archived ? 1 : 0),
-            '\(row.version)', '\(row.source)', '\(row.originator)');
+            originator, title) VALUES ('\(row.id)', '\(rollout)', '\(row.cwd)', 'main', \(millis),
+            \(row.archived ? 1 : 0), '\(row.version)', '\(row.source)', '\(row.originator)', '\(row.title)');
             """
     }
     try #require(sqlite3_exec(db, sql, nil, nil, nil) == SQLITE_OK)
@@ -91,6 +92,16 @@ struct CodexAdapterTests {
         #expect(session.kind == .observed)
         #expect(result.diagnostics.isEmpty)
         #expect(result.formatVersions == ["codex.state": "5", "codex.cli": "0.161.0"])
+        #expect(session.title == nil)
+    }
+
+    /// `SPEC.md` 5.2 A: `threads.title` is the row title. An empty title is no title.
+    @Test func threadTitleBecomesSessionTitle() async throws {
+        var titled = Row(id: fakeID(1), cwd: "/Users/you/Projects/api", rollout: "rollout-working.jsonl",
+                         updated: now.addingTimeInterval(-30))
+        titled.title = "Fake thread title"
+        let result = try await snapshot([titled], [tui(101, "/Users/you/Projects/api")])
+        #expect(result.sessions.first?.title == "Fake thread title")
     }
 
     @Test func liveTUIAfterTaskCompleteOrAbortIsIdle() async throws {

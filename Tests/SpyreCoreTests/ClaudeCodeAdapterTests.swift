@@ -81,10 +81,12 @@ struct ClaudeCodeAdapterTests {
         #expect(busy.branch == "feat/login")
         #expect(busy.lastActivity == t0.addingTimeInterval(90.5))
         #expect(busy.kind == .observed && !busy.isChildSession)
+        #expect(busy.title == "Fake session")
 
         let waiting = try #require(sessions["\(uuid)102"])
         #expect(waiting.status == .waiting)
         #expect(waiting.waitingReason == "permission prompt")
+        #expect(waiting.title == nil)
 
         #expect(sessions["\(uuid)106"]?.status == .unknown)
     }
