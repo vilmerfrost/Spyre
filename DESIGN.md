@@ -128,6 +128,7 @@ The dark and high-contrast themes set their own values.
 | `size.border` | `1` | Border width |
 | `size.menu.width` | `320` | Menubar window width |
 | `size.window.width` / `size.window.height` | `720` / `480` | Main window minimum size |
+| `size.welcome.width` | `460` | First-run window width. The height fits the content. |
 
 ### 5.3 Material, font, and motion
 

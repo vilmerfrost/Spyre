@@ -10,17 +10,21 @@ public struct SpyreConfig: Sendable, Equatable {
     public var adapterRefreshTimeout: TimeInterval
     /// Seconds a `done` row stays in the list after the session ended.
     public var doneRowTimeout: TimeInterval
+    /// `true` after the user clicked "Start watching" on the first-run screen. `SPEC.md` 4.8.
+    public var welcomeSeen: Bool
 
     public init(
         alertDelay: TimeInterval = 3,
         noActivityThreshold: TimeInterval = 10 * 60,
         adapterRefreshTimeout: TimeInterval = 2,
-        doneRowTimeout: TimeInterval = 10 * 60
+        doneRowTimeout: TimeInterval = 10 * 60,
+        welcomeSeen: Bool = false
     ) {
         self.alertDelay = alertDelay
         self.noActivityThreshold = noActivityThreshold
         self.adapterRefreshTimeout = adapterRefreshTimeout
         self.doneRowTimeout = doneRowTimeout
+        self.welcomeSeen = welcomeSeen
     }
 
     public static let `default` = SpyreConfig()

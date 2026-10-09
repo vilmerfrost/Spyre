@@ -37,6 +37,11 @@ struct MenuContentView: View {
             Button("Open Spyre") { openWindow(id: "main") }
                 .buttonStyle(.borderedProminent)
                 .tint(tokens.color("color.accent"))
+            Button("Show welcome screen") { model.showWelcome() }
+                .buttonStyle(.borderless)
+                .font(tokens.font("label"))
+                .foregroundStyle(tokens.color("color.text.secondary"))
+                .accessibilityLabel("Show welcome screen")
         }
         .padding(tokens.value("space.lg"))
         .frame(width: tokens.value("size.menu.width"))

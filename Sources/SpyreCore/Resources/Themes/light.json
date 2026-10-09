@@ -26,6 +26,8 @@
     "size.window.width": 720,
     "size.window.height": 480,
     "size.menu.width": 320,
+    "size.welcome.width": 460,
+    "size.border": 1,
     "opacity.card": 0.72,
     "font.body.size": 13,
     "font.label.size": 11,
