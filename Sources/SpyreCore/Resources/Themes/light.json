@@ -61,6 +61,9 @@
     "size.status.column": 16,
     "size.child.indent": 20,
     "size.icon.empty": 16,
+    "size.icon.agent": 11,
+    "size.selection.line": 2,
+    "size.hoverButton": 24,
     "size.spinner.line": 1.5,
     "size.switcher.height": 26,
     "size.window.width": 560,
@@ -118,9 +121,13 @@
     "icon.status.unknown": "questionmark.circle",
     "icon.flag.noActivity": "clock.badge.exclamationmark",
     "icon.action.openFolder": "folder",
+    "icon.action.showApp": "arrow.up.forward.app",
+    "icon.action.copy": "doc.on.doc",
     "icon.disclosure": "chevron.right",
     "icon.child": "arrow.turn.down.right",
     "icon.empty": "cube",
+    "icon.agent.claudeCode": "sparkle",
+    "icon.agent.codex": "terminal",
     "icon.app": "dot.radiowaves.left.and.right"
   }
 }

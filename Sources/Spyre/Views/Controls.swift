@@ -196,7 +196,9 @@ struct RowTag: View {
             .font(tokens.font("tag"))
             .foregroundStyle(tokens.color("color.text.secondary"))
             .padding(.horizontal, tokens.value("space.xs"))
-            .background(tokens.color("color.surface.tag"), in: RoundedRectangle(cornerRadius: tokens.value("radius.tag")))
+            .background(
+                tokens.color("color.surface.tag"), in: RoundedRectangle(cornerRadius: tokens.value("radius.tag"))
+            )
     }
 }
 

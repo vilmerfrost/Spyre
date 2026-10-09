@@ -38,6 +38,14 @@ public struct SessionRowText: Sendable, Equatable {
         [project == title ? nil : project, branch, agent, mode].compactMap { $0 }.joined(separator: " · ")
     }
 
+    /// Line 2 in two parts around the agent name, so the main window can put the agent mark before the name:
+    /// `lead` ends with " · " when it is not empty, and `agentAndMode` is "Codex · exec".
+    public var detailParts: (lead: String, agentAndMode: String) {
+        let lead = [project == title ? nil : project, branch].compactMap { $0 }.joined(separator: " · ")
+        let rest = [agent, mode].compactMap { $0 }.joined(separator: " · ")
+        return (lead.isEmpty ? "" : lead + " · ", rest)
+    }
+
     static func project(_ path: String, homeDirectory: String) -> String? {
         let folder = normalized(path)
         guard !folder.isEmpty else { return nil }

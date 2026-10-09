@@ -144,7 +144,7 @@ public actor ClaudeCodeAdapter: AgentAdapter {
 
     private func placeholder(pid: Int32, now: Date) -> SessionRecord {
         SessionRecord(id: "claude-pid-\(pid)", agent: .claudeCode, workingDirectory: "", status: .starting,
-                      lastActivity: now)
+                      lastActivity: now, processID: pid)
     }
 
     /// `SPEC.md` 4.5 gap rules. Metadata comes from any parsed file. Status comes only from a good read.
@@ -153,6 +153,8 @@ public actor ClaudeCodeAdapter: AgentAdapter {
             if let id = entry.sessionId { item.record.id = id }
             if let cwd = entry.cwd { item.record.workingDirectory = cwd }
             if let name = entry.name { item.record.title = name }
+            if let host = SessionHost(claudeEntrypoint: entry.entrypoint) { item.record.host = host }
+            if let started = entry.startedAt { item.record.startedAt = Date(timeIntervalSince1970: started / 1000) }
             if let date = entry.lastActivity { item.record.lastActivity = date }
             if let cwd = entry.cwd, let id = entry.sessionId,
                let summary = transcripts.summary(cwd: cwd, sessionID: id) {
@@ -208,7 +210,8 @@ public actor ClaudeCodeAdapter: AgentAdapter {
             let key = "c\(process.pid)"
             var record = SessionRecord(
                 id: "claude-child-\(process.pid)", agent: .claudeCode, workingDirectory: "", status: .unknown,
-                lastActivity: process.startTime ?? now, isChildSession: true
+                lastActivity: process.startTime ?? now, isChildSession: true, processID: process.pid,
+                startedAt: process.startTime
             )
             record.parentID = parentRecordID(of: process, byPID: byPID, registryPIDs: registryPIDs)
             let cwd = processScanner.workingDirectory(of: process.pid)

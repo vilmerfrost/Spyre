@@ -50,15 +50,16 @@ private func makeRoot(_ rows: [Row], database: Bool = true) throws -> URL {
         CREATE TABLE threads (id TEXT PRIMARY KEY, rollout_path TEXT NOT NULL, cwd TEXT NOT NULL,
         title TEXT NOT NULL DEFAULT '', git_branch TEXT, updated_at_ms INTEGER,
         archived INTEGER NOT NULL DEFAULT 0, cli_version TEXT NOT NULL DEFAULT '',
-        source TEXT NOT NULL DEFAULT '', originator TEXT NOT NULL DEFAULT '');
+        source TEXT NOT NULL DEFAULT '', originator TEXT NOT NULL DEFAULT '', created_at_ms INTEGER);
         """
     for row in rows {
         let rollout = fixtureRoot.appendingPathComponent(row.version).appendingPathComponent(row.rollout).path
         let millis = Int64(row.updated.timeIntervalSince1970 * 1000)
         sql += """
             INSERT INTO threads (id, rollout_path, cwd, git_branch, updated_at_ms, archived, cli_version, source,
-            originator, title) VALUES ('\(row.id)', '\(rollout)', '\(row.cwd)', 'main', \(millis),
-            \(row.archived ? 1 : 0), '\(row.version)', '\(row.source)', '\(row.originator)', '\(row.title)');
+            originator, title, created_at_ms) VALUES ('\(row.id)', '\(rollout)', '\(row.cwd)', 'main', \(millis),
+            \(row.archived ? 1 : 0), '\(row.version)', '\(row.source)', '\(row.originator)', '\(row.title)',
+            \(millis - 60_000));
             """
     }
     try #require(sqlite3_exec(db, sql, nil, nil, nil) == SQLITE_OK)
@@ -102,6 +103,26 @@ struct CodexAdapterTests {
         titled.title = "Fake thread title"
         let result = try await snapshot([titled], [tui(101, "/Users/you/Projects/api")])
         #expect(result.sessions.first?.title == "Fake thread title")
+    }
+
+    /// The detail line and "Show app": host, start (`created_at_ms`), CLI version, and the TUI process ID.
+    @Test func liveThreadGivesHostStartVersionAndProcessID() async throws {
+        let updated = now.addingTimeInterval(-30)
+        var exec = Row(id: fakeID(2), cwd: "/Users/you/Projects/web", rollout: "rollout-idle.jsonl", updated: now)
+        exec.source = "exec"
+        let rows = [Row(id: fakeID(1), cwd: "/Users/you/Projects/api", rollout: "rollout-working.jsonl",
+                        updated: updated), exec]
+        let result = try await snapshot(
+            rows, [tui(301, "/Users/you/Projects/api"), tui(300, "/Users/you/Projects/api"),
+                   tui(302, "/Users/you/Projects/web")]
+        )
+        let tuiSession = try #require(result.sessions.first { $0.id == fakeID(1) })
+        #expect(tuiSession.host == .codex)
+        #expect(tuiSession.processID == 300)
+        #expect(tuiSession.agentVersion == "0.161.0")
+        let start = try #require(tuiSession.startedAt)
+        #expect(abs(start.timeIntervalSince(updated.addingTimeInterval(-60))) < 0.01)
+        #expect(result.sessions.first { $0.id == fakeID(2) }?.host == .exec)
     }
 
     @Test func liveTUIAfterTaskCompleteOrAbortIsIdle() async throws {

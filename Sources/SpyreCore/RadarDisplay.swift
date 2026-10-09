@@ -29,7 +29,8 @@ public enum CountLineContent: Sendable, Equatable {
         case .attention(let counts):
             "\(counts.needsYou) need you, \(counts.working) working, \(counts.idle) idle"
         case .calm(let summary):
-            summary.isEmpty ? Self.calmTitle : "\(Self.calmTitle) \(summary.replacingOccurrences(of: " · ", with: ", "))"
+            summary.isEmpty
+                ? Self.calmTitle : "\(Self.calmTitle) \(summary.replacingOccurrences(of: " · ", with: ", "))"
         }
     }
 }

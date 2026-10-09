@@ -136,7 +136,20 @@ The dock is a vertical strip on one screen edge.
 - No sessions: a still outline ice cube (`icon.empty`, `size.icon.empty`, secondary), "Nothing running.", and
   what to do next. No animation.
 - The shortcut hint (⌃⌥S) uses `font.hint` and `color.text.secondary`, quieter than the switcher labels.
-- Hover shows "Open folder". The context menu has the same action.
+- A click on a row runs "Show app" (`SPEC.md` 4.3). It never reorders rows. Rows never move under the pointer.
+- Hover shows two quiet icon buttons (`size.hoverButton` hit area, each with a tooltip) in place of the note:
+  "Show app" (`icon.action.showApp`) and "Open folder" (`icon.action.openFolder`). The time stays. A detail chevron
+  (`icon.disclosure`) after the time shows on hover and while the detail line is open.
+- The context menu: "Show app", "Open folder in Finder", "Copy path", "Show details" / "Hide details".
+- The detail line opens under the row, from the title edge: label and value pairs in `font.label` and
+  `color.text.secondary`. The Session ID has a copy button (`icon.action.copy`).
+- The row whose detail line is open is selected: a `size.selection.line` frost-blue leading line (`color.accent`)
+  and `color.surface.controlSelected`. One row at a time.
+- Agent mark: a small monochrome mark (`icon.agent.claudeCode`, `icon.agent.codex`, `size.icon.agent`,
+  `color.text.secondary`) before the agent name on line 2, in the main window only. The menubar rows stay text.
+  The mark is hidden from VoiceOver; the text says the name. The tokens point to neutral SF Symbols as
+  placeholders. Official logos need written permission from Anthropic / OpenAI; until then, placeholders.
+  An official asset can later replace the token value.
 
 ## 3. Token rules
 
@@ -235,6 +248,9 @@ The Dark column shows the Fog Dark value. "=" means the light value.
 | `size.row.disclosureHeight` | `32` | "Earlier N" disclosure row in the Idle panel |
 | `size.child.indent` | `20` | Child title indent from the parent title |
 | `size.icon.empty` | `16` | Ice cube in the empty state |
+| `size.icon.agent` | `11` | Agent mark on line 2 (tuned from about 12, so line 2 keeps its height) |
+| `size.selection.line` | `2` | Leading line of the selected row |
+| `size.hoverButton` | `24` | Hit area of a row's hover icon buttons |
 | `size.content.maxWidth` | `760` | Maximum width of the main window content column |
 | `size.icon.status` | `13` | Status glyph |
 | `size.status.column` | `16` | Width of the status glyph column, so titles align |
@@ -299,6 +315,10 @@ The Dark column shows the Fog Dark value. "=" means the light value.
 | `icon.status.unknown` | `questionmark.circle` |
 | `icon.flag.noActivity` | `clock.badge.exclamationmark` |
 | `icon.action.openFolder` | `folder` |
+| `icon.action.showApp` | `arrow.up.forward.app` |
+| `icon.action.copy` | `doc.on.doc` |
+| `icon.agent.claudeCode` | `sparkle` (placeholder, not a logo) |
+| `icon.agent.codex` | `terminal` (placeholder, not a logo) |
 | `icon.disclosure` | `chevron.right` |
 | `icon.child` | `arrow.turn.down.right` |
 | `icon.empty` | `cube` (still outline ice cube, empty state) |

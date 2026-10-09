@@ -72,8 +72,13 @@ public actor CodexAdapter: AgentAdapter {
     public func refresh() async -> AdapterSnapshot {
         let time = now()
         let scanner = processes
-        let liveFolders = Set(scanner.processes().filter(Self.isTerminalSession)
-            .compactMap { scanner.workingDirectory(of: $0.pid) }.map(Self.normalized))
+        // Each live folder with the lowest TUI process ID in it. "Show app" starts at that process.
+        var livePIDs: [String: Int32] = [:]
+        for process in scanner.processes().filter(Self.isTerminalSession) {
+            guard let folder = scanner.workingDirectory(of: process.pid).map(Self.normalized) else { continue }
+            livePIDs[folder] = min(livePIDs[folder] ?? process.pid, process.pid)
+        }
+        let liveFolders = Set(livePIDs.keys)
         let index = CodexThreadIndex(codexRoot: codexRoot)
 
         guard let database = index.latestDatabase() else {
@@ -105,7 +110,9 @@ public actor CodexAdapter: AgentAdapter {
                     diagnostics.append(AdapterDiagnostic(source: "codex.rollout", message: "rollout unreadable"))
                 }
                 let activity = max(thread.updatedAt, reading.lastActivity ?? thread.updatedAt)
-                sessions.append(record(thread, status: reading.status, lastActivity: activity))
+                var live = record(thread, status: reading.status, lastActivity: activity)
+                live.processID = livePIDs[folder]
+                sessions.append(live)
             } else if time.timeIntervalSince(thread.updatedAt) <= doneWindow {
                 sessions.append(record(thread, status: .done, lastActivity: thread.updatedAt))
             }
@@ -117,7 +124,9 @@ public actor CodexAdapter: AgentAdapter {
             let firstSeen = firstSeenWithoutThread[folder] ?? time
             firstSeenWithoutThread[folder] = firstSeen
             let timedOut = time.timeIntervalSince(firstSeen) >= config.adapterRefreshTimeout
-            sessions.append(folderRecord(folder, status: timedOut ? .unknown : .starting, lastActivity: firstSeen))
+            var live = folderRecord(folder, status: timedOut ? .unknown : .starting, lastActivity: firstSeen)
+            live.processID = livePIDs[folder]
+            sessions.append(live)
         }
 
         let reported = Set(sessions.map(\.id))
@@ -148,7 +157,8 @@ public actor CodexAdapter: AgentAdapter {
             id: thread.id, agent: .codex, workingDirectory: thread.cwd, title: thread.title,
             branch: thread.gitBranch,
             status: Self.shownStatus(status, isExec: isExec), lastActivity: lastActivity,
-            label: isExec ? "exec" : nil
+            label: isExec ? "exec" : nil, host: isExec ? .exec : .codex, startedAt: thread.createdAt,
+            agentVersion: thread.cliVersion
         )
     }
 
@@ -160,7 +170,7 @@ public actor CodexAdapter: AgentAdapter {
 
     private func folderRecord(_ folder: String, status: SessionStatus, lastActivity: Date) -> SessionRecord {
         SessionRecord(id: "codex:cwd:\(folder)", agent: .codex, workingDirectory: folder, status: status,
-                      lastActivity: lastActivity)
+                      lastActivity: lastActivity, host: .codex)
     }
 
     /// The thread index is unreadable. Each live TUI folder still shows, as `unknown`.
