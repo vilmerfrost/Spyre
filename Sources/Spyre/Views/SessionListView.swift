@@ -50,6 +50,7 @@ struct SessionRow: View {
     private var detail: String {
         var parts = [session.agent.title, session.status.rawValue.capitalized]
         if let branch = session.branch { parts.insert(branch, at: 1) }
+        parts += session.tags
         if session.isStale { parts.append("stale") }
         return parts.joined(separator: " · ")
     }

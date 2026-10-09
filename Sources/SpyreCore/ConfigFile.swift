@@ -39,6 +39,7 @@ public struct ConfigFile: Sendable {
         "alertDelay": 0...300,
         "noActivityThreshold": 60...86_400,
         "adapterRefreshTimeout": 0.5...60,
+        "doneRowTimeout": 0...SpyreConfig.maxDoneRowTimeout,
     ]
 
     public let folder: URL
@@ -112,6 +113,7 @@ extension SpyreConfig {
             case "alertDelay": alertDelay
             case "noActivityThreshold": noActivityThreshold
             case "adapterRefreshTimeout": adapterRefreshTimeout
+            case "doneRowTimeout": doneRowTimeout
             default: 0
             }
         }
@@ -120,6 +122,7 @@ extension SpyreConfig {
             case "alertDelay": alertDelay = newValue
             case "noActivityThreshold": noActivityThreshold = newValue
             case "adapterRefreshTimeout": adapterRefreshTimeout = newValue
+            case "doneRowTimeout": doneRowTimeout = newValue
             default: break
             }
         }

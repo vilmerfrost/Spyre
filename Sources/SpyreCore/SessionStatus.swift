@@ -99,6 +99,13 @@ public struct SessionRecord: Sendable, Identifiable, Equatable {
         URL(fileURLWithPath: workingDirectory).lastPathComponent
     }
 
+    /// Short row tags: the mode label, then the child-session marks (`SPEC.md` 4.6). Empty for most sessions.
+    public var tags: [String] {
+        var tags = label.map { [$0] } ?? []
+        if isChildSession { tags += [parentID == nil ? "child, no parent" : "child session", "experimental"] }
+        return tags
+    }
+
     /// `true` when a working session had no activity for longer than the threshold.
     public func hasNoActivityFlag(now: Date, config: SpyreConfig) -> Bool {
         status == .working && now.timeIntervalSince(lastActivity) > config.noActivityThreshold

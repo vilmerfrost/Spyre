@@ -52,6 +52,18 @@ struct ConfigFileTests {
         #expect(result.warnings.count == 2)
     }
 
+    @Test func doneRowTimeoutDefaultInvalidAndClamp() {
+        #expect(SpyreConfig.default.doneRowTimeout == 600)
+        #expect(load(#"{"doneRowTimeout":120}"#).config.doneRowTimeout == 120)
+        let wrongType = load(#"{"doneRowTimeout":"10 min"}"#)
+        #expect(wrongType.config.doneRowTimeout == 600)
+        #expect(wrongType.warnings.count == 1)
+        #expect(load(#"{"doneRowTimeout":-5}"#).config.doneRowTimeout == 0)
+        let high = load(#"{"doneRowTimeout":1000000}"#)
+        #expect(high.config.doneRowTimeout == 86_400)
+        #expect(high.warnings.count == 1)
+    }
+
     @Test func missingFileIsCreatedWithDefaults() throws {
         let folder = tempFolder()
         defer { try? FileManager.default.removeItem(at: folder) }

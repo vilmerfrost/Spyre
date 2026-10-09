@@ -105,7 +105,7 @@ struct CodexAdapterTests {
             Row(id: fakeID(4), cwd: "/Users/you/Projects/api", rollout: "rollout-working.jsonl",
                 updated: now.addingTimeInterval(-60)),
             Row(id: fakeID(5), cwd: "/Users/you/Projects/old", rollout: "rollout-idle.jsonl",
-                updated: now.addingTimeInterval(-3600)),
+                updated: now.addingTimeInterval(-SpyreConfig.maxDoneRowTimeout - 1)),
             Row(id: fakeID(6), cwd: "/Users/you/Projects/arch", rollout: "rollout-idle.jsonl", updated: now,
                 archived: true),
         ]

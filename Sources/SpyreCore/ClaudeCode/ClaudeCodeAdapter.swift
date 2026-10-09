@@ -14,8 +14,8 @@ public actor ClaudeCodeAdapter: AgentAdapter {
     static let testedVersions: Set<String> = ["2.1.293", "2.1.295"]
     /// A process that started this much later than the registry `startedAt` is a reused PID.
     static let pidReuseTolerance: TimeInterval = 5
-    /// `SPEC.md` 4.4: `done` rows go away after 10 minutes.
-    static let doneRetention: TimeInterval = 10 * 60
+    /// How long an ended session stays in snapshots. The app hides `done` rows earlier, at `doneRowTimeout`.
+    static let doneRetention = SpyreConfig.maxDoneRowTimeout
     private static let logger = Logger(subsystem: "Spyre", category: "ClaudeCodeAdapter")
 
     private nonisolated let sessionsDirectory: URL
@@ -88,6 +88,8 @@ public actor ClaudeCodeAdapter: AgentAdapter {
             tracked[key] = item
         }
 
+        // A new process can run before it writes its registry file. Its child row was not a real child: drop it.
+        for read in reads { tracked["c\(read.pid)"] = nil }
         diagnostics += scanChildSessions(processes: processes, byPID: byPID, reads: reads, now: time, seen: &seen)
 
         for (key, item) in tracked where !seen.contains(key) && item.doneSince == nil {
@@ -195,7 +197,10 @@ public actor ClaudeCodeAdapter: AgentAdapter {
         let registryPIDs = Set(reads.map(\.pid))
         var claimed = Set(reads.compactMap(\.entry?.sessionId))
         var diagnostics: [AdapterDiagnostic] = []
-        let children = processes.filter { Self.isClaudeCode($0.executablePath) && !registryPIDs.contains($0.pid) }
+        // A process that had a registry file is never a child: on exit it deletes the file before it ends.
+        let children = processes.filter {
+            Self.isClaudeCode($0.executablePath) && !registryPIDs.contains($0.pid) && tracked["r\($0.pid)"] == nil
+        }
             .sorted { $0.pid < $1.pid }
 
         for process in children {

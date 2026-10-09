@@ -36,14 +36,15 @@ public actor CodexAdapter: AgentAdapter {
 
     /// - Parameters:
     ///   - codexRoot: The Codex folder, normally `~/.codex`.
-    ///   - doneWindow: How long a thread without a live TUI shows as `done` after its last update.
+    ///   - doneWindow: How long a thread without a live TUI is reported as `done` after its last update.
+    ///     The app hides `done` rows earlier, at `doneRowTimeout`.
     ///   - pollInterval: How often `changes()` asks for a refresh. Process exits have no file event.
     public init(
         codexRoot: URL,
         processes: any ProcessScanner = SystemProcessScanner(),
         config: SpyreConfig = .default,
         now: @escaping @Sendable () -> Date = { Date() },
-        doneWindow: TimeInterval = 10 * 60,
+        doneWindow: TimeInterval = SpyreConfig.maxDoneRowTimeout,
         pollInterval: Duration = .seconds(2)
     ) {
         self.codexRoot = codexRoot
