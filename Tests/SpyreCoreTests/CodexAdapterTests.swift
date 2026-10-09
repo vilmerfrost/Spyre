@@ -7,9 +7,9 @@ import os
 // All IDs and paths are fake. Tests never read the real `~/.codex`.
 
 private let now = Date(timeIntervalSince1970: 1_800_000_000)
-private let fixtures = URL(fileURLWithPath: #filePath)
+private let fixtureRoot = URL(fileURLWithPath: #filePath)
     .deletingLastPathComponent().deletingLastPathComponent()
-    .appendingPathComponent("Fixtures/codex/0.161.0")
+    .appendingPathComponent("Fixtures/codex")
 
 private func fakeID(_ n: Int) -> String { String(format: "00000000-0000-0000-0000-%012d", n) }
 
@@ -32,6 +32,8 @@ private struct Row {
     var archived = false
     var source = "vscode"
     var originator = "codex-tui"
+    /// The writer version. It picks the fixture folder and fills `threads.cli_version`.
+    var version = "0.161.0"
 }
 
 /// A temp Codex root with a `state_5.sqlite` built at runtime.
@@ -50,12 +52,12 @@ private func makeRoot(_ rows: [Row], database: Bool = true) throws -> URL {
         source TEXT NOT NULL DEFAULT '', originator TEXT NOT NULL DEFAULT '');
         """
     for row in rows {
-        let rollout = fixtures.appendingPathComponent(row.rollout).path
+        let rollout = fixtureRoot.appendingPathComponent(row.version).appendingPathComponent(row.rollout).path
         let millis = Int64(row.updated.timeIntervalSince1970 * 1000)
         sql += """
             INSERT INTO threads (id, rollout_path, cwd, git_branch, updated_at_ms, archived, cli_version, source,
             originator) VALUES ('\(row.id)', '\(rollout)', '\(row.cwd)', 'main', \(millis), \(row.archived ? 1 : 0),
-            '0.161.0', '\(row.source)', '\(row.originator)');
+            '\(row.version)', '\(row.source)', '\(row.originator)');
             """
     }
     try #require(sqlite3_exec(db, sql, nil, nil, nil) == SQLITE_OK)
@@ -239,14 +241,14 @@ struct CodexAdapterTests {
     }
 
     @Test func rolloutTailReaderNeedsMoreDataWhenWindowHasNoEvent() throws {
-        let data = try Data(contentsOf: fixtures.appendingPathComponent("rollout-working.jsonl"))
+        let data = try Data(contentsOf: fixtureRoot.appendingPathComponent("0.161.0/rollout-working.jsonl"))
         let lines = data.split(separator: UInt8(ascii: "\n"))
         // Only the last two lines: no status event in the window, so the reader asks for more.
         #expect(CodexRolloutReader.status(lines: Array(lines.suffix(2)), readWholeFile: false) == nil)
         #expect(CodexRolloutReader.status(lines: [], readWholeFile: true)?.status == .unknown)
         // A small tail size still finds the event by growing the window.
         let reader = CodexRolloutReader(tailSizes: [64, 1024 * 1024])
-        #expect(reader.read(fixtures.appendingPathComponent("rollout-working.jsonl")).status == .working)
+        #expect(reader.read(fixtureRoot.appendingPathComponent("0.161.0/rollout-working.jsonl")).status == .working)
     }
 
     @Test func codexAdapterIsDeterministic() async throws {
@@ -258,5 +260,45 @@ struct CodexAdapterTests {
         let first = await adapter.refresh()
         let second = await adapter.refresh()
         #expect(first == second)
+    }
+
+    // MARK: Writer 0.162.0-alpha.2
+
+    /// 0.162.0-alpha.2 adds `thread_settings_applied` and `item_completed` events around the status events.
+    /// Status still comes from `task_started` and `task_complete`.
+    @Test func writer0162StatusFromTaskEvents() async throws {
+        let v = "0.162.0-alpha.2"
+        let rows = [
+            Row(id: fakeID(21), cwd: "/Users/you/Projects/api", rollout: "rollout-working.jsonl", updated: now,
+                version: v),
+            Row(id: fakeID(22), cwd: "/Users/you/Projects/web", rollout: "rollout-idle.jsonl", updated: now,
+                version: v),
+        ]
+        let result = try await snapshot(rows, [tui(1, "/Users/you/Projects/api"), tui(2, "/Users/you/Projects/web")])
+        let status = Dictionary(uniqueKeysWithValues: result.sessions.map { ($0.id, $0.status) })
+        #expect(status == [fakeID(21): .working, fakeID(22): .idle])
+        #expect(result.formatVersions["codex.cli"] == v)
+        #expect(result.diagnostics.isEmpty)
+    }
+
+    /// 0.162.0-alpha.2 can write a JSON object into `threads.source` for a spawned subagent thread (verified).
+    /// The value is not `exec`, so the thread gets no exec label, and parsing never fails.
+    @Test func writer0162JSONSourceIsNotExec() async throws {
+        let json = #"{"subagent":{"thread_spawn":{"parent_thread_id":"00000000-0000-0000-0000-000000000021","depth":1}}}"#
+        let rows = [Row(id: fakeID(23), cwd: "/Users/you/Projects/api", rollout: "rollout-idle.jsonl", updated: now,
+                        source: json, version: "0.162.0-alpha.2")]
+        let result = try await snapshot(rows, [tui(1, "/Users/you/Projects/api")])
+        let session = try #require(result.sessions.first)
+        #expect(session.status == .idle)
+        #expect(session.label == nil)
+    }
+
+    /// The desktop writer used this JSON source form. Desktop threads stay out of scope (5.2).
+    @Test func writer0162DesktopSubagentThreadIsExcluded() async throws {
+        let json = #"{"subagent":{"thread_spawn":{"parent_thread_id":"00000000-0000-0000-0000-000000000021","depth":1}}}"#
+        let rows = [Row(id: fakeID(24), cwd: "/Users/you/Projects/api", rollout: "rollout-idle.jsonl", updated: now,
+                        source: json, originator: "Codex Desktop", version: "0.162.0-alpha.2")]
+        let result = try await snapshot(rows, [])
+        #expect(result.sessions.isEmpty)
     }
 }

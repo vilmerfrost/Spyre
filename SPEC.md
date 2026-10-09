@@ -407,6 +407,8 @@ Rules for the process scan:
 | ChatGPT desktop app | `vscode`, `exec`, or JSON (subagent) | `Codex Desktop` |
 
 Older rows have other values, and often an empty `originator`.
+- JSON `source` example (verified with writer 0.162.0-alpha.2): `{"subagent":{"thread_spawn":{"parent_thread_id":"…","depth":1,…}}}`. Spyre compares `source` as plain text. Only the exact value `exec` gives the exec label. A JSON value never fails parsing.
+- **Writer version.** The daemon writes the thread row and the rollout, not the TUI (verified). A TUI 0.162.0 that started the installed daemon 0.161.0 wrote `cli_version` `0.161.0` and the 0.161.0 format. So `cli_version` and the `codex.cli` format version name the writer, which is the daemon. A Codex update changes the format only when the daemon package updates.
 - Open read-only. Codex keeps this file open in WAL mode while it runs (verified). Never write, never checkpoint.
 
 **B. Rollout**
@@ -421,6 +423,7 @@ Older rows have other values, and often an empty `originator`.
 | `task_complete` | `idle` |
 | `turn_aborted` | `idle` |
 
+- Other event types are ignored. Writer 0.162.0-alpha.2 adds `thread_settings_applied` and `item_completed` around the status events (verified). Fixtures: `Tests/Fixtures/codex/0.161.0/` and `Tests/Fixtures/codex/0.162.0-alpha.2/`.
 - The rollout has no exit record. A killed session and a cleanly closed session end with the same `task_complete` record (verified).
 - Approval events (`exec_approval_request`, `apply_patch_approval_request`, `request_user_input`) exist in the binary. They were not seen in rollout files. This is why Codex has no `waiting` status in the MVP.
 

@@ -1,0 +1,6 @@
+{"timestamp":"2026-10-09T12:00:00.000Z","ordinal":0,"type":"session_meta","payload":{"id":"00000000-0000-0000-0000-000000000021","session_id":"00000000-0000-0000-0000-000000000021","cwd":"/Users/you/Projects/api","cli_version":"0.162.0-alpha.2","originator":"codex-tui","source":"vscode","history_mode":"full","context_window":272000}}
+{"timestamp":"2026-10-09T12:00:01.000Z","ordinal":1,"type":"event_msg","payload":{"type":"thread_settings_applied","thread_id":"00000000-0000-0000-0000-000000000021","thread_settings":{}}}
+{"timestamp":"2026-10-09T12:00:02.000Z","ordinal":2,"type":"event_msg","payload":{"type":"task_started","turn_id":"turn-1","root_turn_id":"turn-1","started_at":1791547202,"model_context_window":272000,"collaboration_mode_kind":"default"}}
+{"timestamp":"2026-10-09T12:00:03.000Z","ordinal":3,"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"fake prompt"}]}}
+{"timestamp":"2026-10-09T12:00:04.000Z","ordinal":4,"type":"event_msg","payload":{"type":"item_completed","thread_id":"00000000-0000-0000-0000-000000000021","turn_id":"turn-1","started_at_ms":1791547203000,"completed_at_ms":1791547204000,"item":{}}}
+{"timestamp":"2026-10-09T12:00:05.000Z","ordinal":5,"type":"event_msg","payload":{"type":"token_count","info":null,"rate_limits":null}}
