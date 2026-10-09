@@ -65,6 +65,8 @@ final class AppModel {
     private var hotkeyWarning: String?
     private let makeAdapters: @Sendable (SpyreConfig) -> [any AgentAdapter]
     private var store: SessionStore?
+    /// VoiceOver announcements for sessions that need you. `SPEC.md` 4.1.
+    private var announcer = NeedsYouAnnouncer(alertDelay: SpyreConfig.default.alertDelay)
     private var configWatcher: ConfigWatcher?
     private static let logger = Logger(subsystem: "io.github.vilmerfrost.spyre", category: "config")
 
@@ -157,6 +159,11 @@ final class AppModel {
         mainWindow.show(limits: limits, appearance: tokens.appearance) {
             ThemedRoot { MainWindowView() }.environment(self)
         }
+    }
+
+    /// ⌘W in the main window. Spyre keeps running.
+    func closeMainWindow() {
+        mainWindow.close()
     }
 
     /// The main window height follows its content. `DESIGN.md` 2.5.
@@ -254,7 +261,31 @@ final class AppModel {
         self.store = store
         Task.detached { await store.run() }
         Task { [weak self] in
-            for await sessions in store.updates { self?.sessions = sessions }
+            for await sessions in store.updates {
+                self?.sessions = sessions
+                self?.announce()
+            }
         }
+        // A session becomes due `alertDelay` after it started waiting, also when no new snapshot arrives.
+        Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                self?.announce()
+            }
+        }
+    }
+
+    /// Posts "{Title} needs you. {Reason}." or "{N} sessions need you.", only while VoiceOver runs.
+    /// Never for working, idle, or done. At most one per 5 s. Priority medium. `SPEC.md` 4.1.
+    private func announce() {
+        announcer.alertDelay = config.alertDelay
+        let home = NSHomeDirectory()
+        let title: (SessionRecord) -> String = { SessionRowText($0, homeDirectory: home).title }
+        guard let text = announcer.update(sessions, now: Date(), title: title),
+              NSWorkspace.shared.isVoiceOverEnabled else { return }
+        NSAccessibility.post(
+            element: NSApp as Any, notification: .announcementRequested,
+            userInfo: [.announcement: text, .priority: NSAccessibilityPriorityLevel.medium.rawValue]
+        )
     }
 }

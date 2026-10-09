@@ -18,6 +18,7 @@ struct MainWindowView: View {
     @State private var section: AppSection = .radar
     @State private var headerHeight: CGFloat = 0
     @State private var sectionHeight: CGFloat = 0
+    @FocusState private var focus: MainFocus?
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -25,7 +26,7 @@ struct MainWindowView: View {
             VStack(alignment: .leading, spacing: tokens.value("space.lg")) {
                 header.measuredHeight($headerHeight)
                 switch section {
-                case .radar: RadarView(height: $sectionHeight)
+                case .radar: RadarView(height: $sectionHeight, focus: $focus)
                 case .grab, .lab:
                     ComingSoonView(section: section)
                         .padding(.bottom, tokens.value("space.xl"))
@@ -36,6 +37,16 @@ struct MainWindowView: View {
             .padding(.horizontal, tokens.value("space.xl"))
         }
         .background(tokens.color("color.background.base"))
+        .background {
+            // ⌘W closes the main window. Spyre keeps running in the menubar.
+            Button("Close window") { model.closeMainWindow() }
+                .keyboardShortcut("w")
+                .hidden()
+                .accessibilityHidden(true)
+        }
+        // macOS gives the first stop focus when the window opens. The ring is for keyboard focus only, so the
+        // window opens with no focus; Tab then reaches the switcher.
+        .task { focus = nil }
         .onChange(of: headerHeight + sectionHeight, initial: true) { _, height in
             model.mainContentHeightChanged(height + tokens.value("space.lg"))
         }
@@ -43,7 +54,17 @@ struct MainWindowView: View {
 
     private var header: some View {
         HStack {
-            SectionSwitcher(selection: $section)
+            SectionSwitcher(selection: $section, showsFocusRing: focus == .switcher)
+                .focusable()
+                .focused($focus, equals: .switcher)
+                .focusEffectDisabled()
+                .onKeyPress(keys: [.leftArrow, .rightArrow]) { press in
+                    let all = AppSection.allCases
+                    guard let index = all.firstIndex(of: section) else { return .ignored }
+                    let next = press.key == .leftArrow ? index - 1 : index + 1
+                    if all.indices.contains(next) { section = all[next] }
+                    return .handled
+                }
             Spacer()
             Text(model.config.hotkey.displayString)
                 .font(tokens.font("hint"))
@@ -59,6 +80,7 @@ struct MainWindowView: View {
 /// It reports the height it needs, so the window can fit it.
 private struct RadarView: View {
     @Binding var height: CGFloat
+    var focus: FocusState<MainFocus?>.Binding
     @Environment(AppModel.self) private var model
     @Environment(\.tokens) private var tokens
     @State private var topHeight: CGFloat = 0
@@ -75,12 +97,16 @@ private struct RadarView: View {
                         .onAppear { listHeight = 0 }
                 } else {
                     CountLine(content: CountLineContent(SessionCounts(sessions))).measuredHeight($topHeight)
-                    ScrollView {
-                        SessionListView(sessions: sessions, now: context.date)
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            SessionListView(sessions: sessions, now: context.date, focus: focus) { item in
+                                proxy.scrollTo(item)
+                            }
                             .padding(.bottom, tokens.value("space.xl"))
                             .measuredHeight($listHeight)
+                        }
+                        .scrollIndicators(.automatic)
                     }
-                    .scrollIndicators(.automatic)
                 }
             }
         }

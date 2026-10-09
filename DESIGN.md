@@ -220,7 +220,8 @@ The Dark column shows the Fog Dark value. "=" means the light value.
 | `color.text.secondary` | `#545B65` | `#9AA2AC` | Labels, metadata, muted counts |
 | `color.text.onAccent` | `#1F2328` | `#14171B` | Text on the accent fill |
 | `color.accent` | `#8FB4D9` | `#8FB4D9` | Frost-blue signature. Focus, selection, primary button. |
-| `color.focus` | `#3F7FBF` | `#8FB4D9` | Focus ring |
+| `color.focus` | `#3F7FBF` | `#8FB4D9` | Focus ring (3:1 or more on every surface) |
+| `color.border.strong` | `#1F23288C` | `#FFFFFF73` | Panel border under Increase Contrast (High Contrast: `#000000`) |
 | `color.status.working` | `#2A5E98` | `#83AEDF` | Working |
 | `color.status.waiting` | `#8A5300` | `#E0A84E` | Waiting ("needs you") |
 | `color.status.idle` | `#5B616B` | `#98A0AA` | Idle |
@@ -251,6 +252,8 @@ The Dark column shows the Fog Dark value. "=" means the light value.
 | `size.icon.agent` | `11` | Agent mark on line 2 (tuned from about 12, so line 2 keeps its height) |
 | `size.selection.line` | `2` | Leading line of the selected row |
 | `size.hoverButton` | `24` | Hit area of a row's hover icon buttons |
+| `size.focus.width` / `size.focus.widthIncreased` | `2` / `3` | Keyboard focus ring; 3 under Increase Contrast |
+| `size.focus.offset` | `1` | Gap between an item and its focus ring |
 | `size.content.maxWidth` | `760` | Maximum width of the main window content column |
 | `size.icon.status` | `13` | Status glyph |
 | `size.status.column` | `16` | Width of the status glyph column, so titles align |
@@ -436,12 +439,22 @@ Theme import must never crash Spyre and must never use the network.
 - Check contrast against the card color composed over the background. For wallpaper blur, set `opacity.card` to at least 0.85. The wallpaper color is not known.
 - Imported themes: a theme that fails AA still loads. Spyre shows a warning for each failing text pair. Spyre does not change the colors. The user can switch back to a built-in theme at any time.
 
+### 10.1.1 Keyboard focus
+
+- The main window has two keyboard stops: the section switcher, then the session list (Tab order). The count line
+  is not a stop. ↑/↓ move inside the list; the ring follows. `SPEC.md` 4.2 lists the keys.
+- The focus ring: `size.focus.width` in `color.focus`, `size.focus.offset` outside the item, `radius.row`.
+  It shows for keyboard focus only; a click hides it. The list draws it above the panels, so no panel clips it.
+- The switcher shows the same ring as a capsule.
+
 ### 10.2 Reduce Transparency
 
 When macOS "Reduce Transparency" is on:
 
 - Cards and the dock are opaque: opacity 1.0, blur 0.
 - The translucent switcher track (`color.surface.control`) is drawn as the opaque `color.surface.row`.
+- The translucent tag fill (`color.surface.tag`) is drawn as the opaque `color.surface.rowHover`.
+- The focus ring is opaque, so it stays visible.
 - Wallpaper blur changes to the solid background.
 - The atmosphere stays. It is a background, not a transparent surface.
 
@@ -454,6 +467,17 @@ When macOS "Reduce Motion" is on:
 - The waiting pulse is off. The ring stays full and uses a thicker line.
 - Cards, rows, and the dock do not slide or spring. They change with a crossfade of at most `motion.duration.fast`, or at once.
 - Status changes still show at once. Motion never hides a state change.
+- Folds are instant. Hover is a color change only (no fade), and count numbers change without a roll.
+
+### 10.3.1 Increase Contrast
+
+When macOS "Increase Contrast" is on, Spyre keeps the theme. Panels use `color.border.strong`, and the focus ring
+uses `size.focus.widthIncreased`.
+
+### 10.3.2 Live appearance switch
+
+A Light/Dark change only swaps token values. Keyboard focus, scroll position, fold state, and row order stay.
+Nothing is announced again.
 
 ### 10.4 Other rules
 

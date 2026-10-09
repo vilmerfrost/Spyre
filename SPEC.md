@@ -78,7 +78,11 @@ For example, a user hook can approve a permission prompt automatically (verified
 Spyre must never assume that a `waiting` state stays.
 
 - Attention effects start only when a session stays `waiting` for longer than the alert delay (3 s).
-- Attention effects are the pulse on the dock icon (v0.2) and system notifications (later). The MVP has no attention effects. The alert delay is defined now so that v0.2 uses the same value.
+- Attention effects are the pulse on the dock icon (v0.2), system notifications (later), and, in the MVP, one
+  VoiceOver announcement. The alert delay is defined now so that v0.2 uses the same value.
+- VoiceOver announcement (only while VoiceOver runs, `NSWorkspace.isVoiceOverEnabled`): when a session has been
+  `waiting` for `alertDelay`, Spyre posts "{Title} needs you. {Reason}." at medium priority. When several become due
+  together: "{N} sessions need you." At most one announcement per 5 s. Working, idle, and done are never announced.
 - The badge and the list do not use the alert delay. They always show the current state.
 
 ### 4.2 Session list
@@ -136,6 +140,18 @@ Group the rows by status. Show the groups in this order, each with a header:
   The group header count includes "Earlier" rows and leaves out hidden ones.
 - Freeze the row order while the pointer is over the list. Rows must not move under the pointer. Status text and badges still update. Apply the new order when the pointer leaves the list.
 - Reason: rows that jump under the pointer cause wrong clicks. Another session monitor removed status sorting for this reason (`research/competitors.md`).
+
+**Keyboard (main window).** ⌘1, ⌘2, ⌘3 pick the sections. ↑/↓ move through group headers and rows and stop at the
+ends. →/← unfold and fold a disclosure row; ← on a child row moves to its parent. Space or Return on a disclosure row
+toggles it. Return on a row runs "Show app" (4.3). Space on a row toggles its detail line. Esc moves the focus to the
+section switcher. ⌘W closes the main window; Spyre keeps running. Tab leaves the list. No type-to-filter.
+The menubar window has the same row keys; Esc closes it. Tab order there: rows, "Open Spyre", "More".
+
+**VoiceOver.** A row reads "{Title}. {Status}. {Waiting reason}. {Project}, {branch}, {agent}. Last activity {time}
+ago." with empty parts left out. A child adds "Child session of {parent}.", a flagged row "No activity for {time}.",
+and a stale row "Stale.". Group headers are headings. A disclosure row reads "Idle, 2 sessions" with the value
+"Collapsed" or "Expanded". The count line is one element. A "Needs you" rotor lists the waiting rows. Each row has
+the actions Show app, Open folder in Finder, Copy path, and Show details.
 
 Child sessions show under their parent row. See 4.6.
 

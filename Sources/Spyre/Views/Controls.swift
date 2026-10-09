@@ -5,7 +5,10 @@ import SwiftUI
 /// and never follows the system appearance on its own. `DESIGN.md` 2.
 struct SectionSwitcher: View {
     @Binding var selection: AppSection
+    /// Draws the keyboard focus ring around the switcher.
+    var showsFocusRing = false
     @Environment(\.tokens) private var tokens
+    @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Namespace private var selectionSpace
@@ -22,6 +25,14 @@ struct SectionSwitcher: View {
             tokens.color(reduceTransparency ? "color.surface.row" : "color.surface.control"), in: Capsule()
         )
         .overlay(Capsule().strokeBorder(tokens.color("color.border.subtle"), lineWidth: tokens.value("size.border")))
+        .overlay {
+            if showsFocusRing {
+                let width = tokens.value(contrast == .increased ? "size.focus.widthIncreased" : "size.focus.width")
+                Capsule()
+                    .stroke(tokens.color("color.focus"), lineWidth: width)
+                    .padding(-(tokens.value("size.focus.offset") + width / 2))
+            }
+        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Section")
     }
@@ -55,6 +66,8 @@ struct SectionSwitcher: View {
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)
+        // ⌘1, ⌘2, ⌘3 pick the sections. `SPEC.md` 4.2.
+        .keyboardShortcut(KeyEquivalent(Character("\((AppSection.allCases.firstIndex(of: section) ?? 0) + 1)")))
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
@@ -70,6 +83,7 @@ struct SpyreButtonStyle: ButtonStyle {
 
     var kind: Kind
     @Environment(\.tokens) private var tokens
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hovering = false
 
     func makeBody(configuration: Configuration) -> some View {
@@ -87,7 +101,7 @@ struct SpyreButtonStyle: ButtonStyle {
             }
             .contentShape(Rectangle())
             .onHover { hovering = $0 }
-            .animation(.easeOut(duration: tokens.value("motion.duration.fast")), value: hovering)
+            .animation(reduceMotion ? nil : .easeOut(duration: tokens.value("motion.duration.fast")), value: hovering)
     }
 
     private var foreground: String {
@@ -187,9 +201,11 @@ final class SpinnerLayerView: NSView {
 }
 
 /// A small quiet tag on a row: `experimental`, `stale`. No border, a faint fill.
+/// Under Reduce Transparency the fill is opaque (`color.surface.rowHover`).
 struct RowTag: View {
     let text: String
     @Environment(\.tokens) private var tokens
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
         Text(text)
@@ -197,7 +213,8 @@ struct RowTag: View {
             .foregroundStyle(tokens.color("color.text.secondary"))
             .padding(.horizontal, tokens.value("space.xs"))
             .background(
-                tokens.color("color.surface.tag"), in: RoundedRectangle(cornerRadius: tokens.value("radius.tag"))
+                tokens.color(reduceTransparency ? "color.surface.rowHover" : "color.surface.tag"),
+                in: RoundedRectangle(cornerRadius: tokens.value("radius.tag"))
             )
     }
 }
@@ -208,13 +225,16 @@ struct Panel<Content: View>: View {
     var border = "color.border.row"
     @ViewBuilder let content: () -> Content
     @Environment(\.tokens) private var tokens
+    @Environment(\.colorSchemeContrast) private var contrast
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: tokens.value("radius.panel"))
+        // Increase Contrast keeps the theme and uses the strong border.
+        let edge = contrast == .increased ? "color.border.strong" : border
         VStack(spacing: 0, content: content)
             .background(tokens.color(surface), in: shape)
             .clipShape(shape)
-            .overlay(shape.strokeBorder(tokens.color(border), lineWidth: tokens.value("size.border")))
+            .overlay(shape.strokeBorder(tokens.color(edge), lineWidth: tokens.value("size.border")))
             .shadow(
                 color: tokens.color("color.shadow.panel"),
                 radius: tokens.value("shadow.panel.radius"), y: tokens.value("shadow.panel.y")

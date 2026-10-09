@@ -72,13 +72,32 @@ struct ThemeTests {
         "size.row.disclosureHeight", "size.child.indent", "size.icon.empty", "icon.empty",
         "color.surface.tag", "color.border.segment", "color.shadow.segment", "shadow.segment.radius",
         "shadow.segment.y", "size.icon.agent", "size.selection.line", "size.hoverButton", "icon.agent.claudeCode",
-        "icon.agent.codex", "icon.action.showApp", "icon.action.copy", "font.hint.size", "font.reason.size", "font.calm.size", "font.calmCompact.size",
+        "icon.agent.codex", "icon.action.showApp", "color.border.strong", "size.focus.width",
+        "size.focus.widthIncreased", "size.focus.offset", "icon.action.copy", "font.hint.size", "font.reason.size",
+        "font.calm.size", "font.calmCompact.size",
         "size.menu.maxRows", "size.atmosphere.drift", "size.welcome.scenery", "size.welcome.sceneHeight",
         "shadow.panel.radius", "shadow.panel.y",
         "font.rowTitle.size", "font.section.size", "font.control.size", "font.tag.size", "font.count.size",
         "font.countCompact.size", "font.count.weight", "motion.duration.drift",
         "icon.action.openFolder", "icon.disclosure", "icon.child",
     ]
+
+    /// The focus ring and the Increase Contrast border reach 3:1 against every surface they sit on. `DESIGN.md` 10.1.
+    @Test(arguments: Theme.builtInNames)
+    func focusRingAndStrongBorderContrast(name: String) throws {
+        let theme = try Theme.builtIn(name).filled(from: Theme.builtIn("light"))
+        let focus = try #require(theme.color("color.focus"))
+        let strong = try #require(theme.color("color.border.strong"))
+        let surfaces = ["color.background.base", "color.surface.row", "color.surface.rowHover",
+                        "color.surface.waiting", "color.surface.controlSelected"]
+        for surface in surfaces {
+            let back = try #require(theme.color(surface))
+            #expect(focus.contrast(with: back) >= 3, "\(name): focus on \(surface)")
+            #expect(strong.composited(over: back).contrast(with: back) >= 3, "\(name): strong border on \(surface)")
+        }
+        #expect(theme.number("size.focus.width") == 2)
+        #expect(theme.number("size.focus.widthIncreased") == 3)
+    }
 
     /// Pixel fixes 2 and 11: the "Needs you" border is about 30 % alpha, and the dark warm light is faint.
     @Test func waitingBorderAndDarkLightAreQuiet() throws {

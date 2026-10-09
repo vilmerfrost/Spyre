@@ -10,8 +10,11 @@ struct SessionRow: View {
     let group: StatusGroup
     let now: Date
     var compact = false
+    /// The parent row title of a nested child, for VoiceOver.
+    var parentTitle: String?
     @Environment(AppModel.self) private var model
     @Environment(\.tokens) private var tokens
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hovering = false
 
     private var session: SessionRecord { row.session }
@@ -47,7 +50,8 @@ struct SessionRow: View {
         .contentShape(Rectangle())
         .onTapGesture { model.showApp(session) }
         .onHover { hovering = $0 }
-        .animation(.easeOut(duration: tokens.value("motion.duration.fast")), value: hovering)
+        // Under Reduce Motion, hover is a color change only.
+        .animation(reduceMotion ? nil : .easeOut(duration: tokens.value("motion.duration.fast")), value: hovering)
         .contextMenu { menu }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText(text))
@@ -150,7 +154,7 @@ struct SessionRow: View {
                         }
                     }
                 }
-                .transition(.opacity)
+                .transition(reduceMotion ? .identity : .opacity)
             } else if let note, !compact {
                 Text(note.text)
                     .font(tokens.font("reason"))
@@ -185,10 +189,10 @@ struct SessionRow: View {
     }
 
     private func accessibilityText(_ text: SessionRowText) -> String {
-        var parts = [text.title, session.waitingText.map { "Needs you, \($0)" } ?? session.status.title, text.detail]
-        parts += text.tags
-        parts.append("last activity \(RelativeTime.short(from: session.lastActivity, to: now)) ago")
-        return parts.joined(separator: ", ")
+        RadarSpeech.rowLabel(
+            session, text: text, parentTitle: parentTitle,
+            hasNoActivityFlag: session.hasNoActivityFlag(now: now, config: model.config), now: now
+        )
     }
 }
 
