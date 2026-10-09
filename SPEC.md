@@ -96,6 +96,11 @@ Group the rows by status. Show the groups in this order, each with a header:
 
 Child sessions show under their parent row. See 4.6.
 
+- A child row sits directly under its parent row, indented by `space.lg`. It shows in the parent's group, even when its own status is different. Reason: the child belongs to the parent's session.
+- Children under one parent: the newest last activity comes first.
+- A child whose parent is not in the list is its own top-level row, in its own status group.
+- The badge still counts every `waiting` session, also a nested child.
+
 ### 4.3 Open a session's project
 
 - Click a row to open the session's working directory in the user's terminal app.
