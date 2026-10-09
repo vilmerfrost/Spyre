@@ -51,6 +51,8 @@ Spyre draws it natively (SwiftUI shapes and blur). It uses no image and no netwo
   Core Animation runs the drift in the render server, so it costs almost no app CPU and never re-lays out
   the window. Under Reduce Motion the scene stays and the drift stops.
 - The fog bands are radial fades (no blur filter). The ridges use `blur.atmosphere.ridge`.
+- The scenery (ridges, fog bands, warm light) stays in the lower third of the view. The far ridge has one
+  sharper peak, off the center axis, with the faint warm light behind it.
 - The environment never changes with app state. State shows in the UI only.
 - It is decoration: hidden from VoiceOver and never hit-tested.
 
@@ -79,8 +81,11 @@ Hidden launch arguments, for looking at the UI without a change to system settin
 
 - `-SpyreAppearance light|dark`: see 2.2.
 - `-SpyreDemo`: show the fixed fake sessions of `FakeAdapter` instead of reading `~/.claude` and `~/.codex`.
+  `-SpyreDemo calm` shows a set where nothing needs you (with idle rows old enough to fold and to hide).
+  `-SpyreDemo empty` shows no sessions (the empty state).
 - `-SpyreMenuPreview` (debug builds only): show the menubar window content in a normal window. Use it when the
   menubar hides the Spyre icon, so the real menubar window opens off screen.
+  Run the debug binary directly: `swift build`, then `.build/debug/Spyre -SpyreMenuPreview -SpyreDemo`.
 
 Example: `open -n Spyre.app --args -SpyreAppearance dark -SpyreDemo`, then `open Spyre.app` again for the main window.
 
@@ -101,18 +106,36 @@ The dock is a vertical strip on one screen edge.
 
 ### 2.5 Rows and groups
 
+- The main window height fits its content, from `size.window.height` to `size.window.maxHeight`. The top edge stays
+  put. The width is the user's, from `size.window.width` to `size.window.maxWidth`. The fog fills the rest.
+- macOS keeps the window frame (`NSWindow` frame autosave name `SpyreMainWindow`), not `config.json`.
+  A restored frame is moved onto a visible screen.
 - The content column has a maximum width (`size.content.maxWidth`). In a wide window it is centered.
+- Group headers align with the panel's leading edge. Every header uses this rule.
 - A group of sessions is one panel: `color.surface.row`, `color.border.row`, `radius.panel`, hairline dividers.
-- "Needs you" is first. Its panel has a warning-tinted border (`color.border.waiting`) and surface
-  (`color.surface.waiting`).
+- "Needs you" is first. Its panel has a faint warning-tinted border (`color.border.waiting`) and a near-neutral
+  surface (`color.surface.waiting`). Inside the panel, amber is only on the glyph and the waiting reason.
 - Idle and Done are folded by default behind a disclosure row with a count.
+- In Idle, rows older than `idleFoldAfter` sit behind an "Earlier N" disclosure row at the end of the panel
+  (`size.row.disclosureHeight`). Its chevron sits in the glyph column.
 - A row is about `size.row.height` high. Line 1: title. Line 2 (muted): project · branch · agent, then tags.
-- Right side: the waiting reason or the no-activity flag, then the relative last activity in tabular digits.
+- Right side, on line 1's baseline: the waiting reason (`font.reason`) or the no-activity flag, then the relative
+  last activity in tabular digits. The time sits on line 1's baseline in every row.
+- Tags (`experimental`, `stale`) have no border: a faint fill (`color.surface.tag`), `font.tag`, secondary text.
+  `exec` is plain text at the end of line 2.
   In the compact menubar rows this note moves to the start of line 2, so the title keeps its room.
 - Idle and Done row titles use `color.text.secondary`, so rows that need attention lead.
 - A working row shows a slow spinner (one turn per `motion.duration.ring`, run by Core Animation).
   Under Reduce Motion it is a static partial arc.
-- A child row sits under its parent with a small corner arrow (`icon.child`) and the "experimental" tag.
+- A child row sits under its parent with a small corner arrow (`icon.child`) in the parent's glyph column, and the
+  "experimental" tag. The child's glyph sits at the parent's title edge. The child title is `size.child.indent`
+  right of the parent title.
+- The count line: when something needs you, big numbers and labels on one shared baseline, `space.xs` apart.
+  When nothing needs you, one line: "Nothing needs you." (`font.calm`, secondary) and "1 working · 7 idle"
+  (`font.body`). Zero parts are left out.
+- No sessions: a still outline ice cube (`icon.empty`, `size.icon.empty`, secondary), "Nothing running.", and
+  what to do next. No animation.
+- The shortcut hint (⌃⌥S) uses `font.hint` and `color.text.secondary`, quieter than the switcher labels.
 - Hover shows "Open folder". The context menu has the same action.
 
 ## 3. Token rules
@@ -169,15 +192,17 @@ The Dark column shows the Fog Dark value. "=" means the light value.
 | `color.atmosphere.ridgeNear` | `#D0D4D9` | `#1E2328` | Near ridge |
 | `color.atmosphere.light` | `#EAD9BE` | `#4A4032` | Faint warm light behind the far ridge |
 | `color.surface.card` | `#F2F2F1` | `#1C2025` | Welcome panel |
-| `color.surface.row` | `#F2F2F1` | `#1C2025` | Session panel and row fill |
-| `color.surface.rowHover` | `#F8F8F7` | `#22272D` | Row on hover, disclosure row on hover |
-| `color.surface.waiting` | `#F5F0E7` | `#221F1A` | "Needs you" panel fill |
+| `color.surface.row` | `#E9EBED` | `#1C2025` | Session panel and row fill (cloud-gray, not white) |
+| `color.surface.rowHover` | `#F0F1F2` | `#22272D` | Row on hover, disclosure row on hover |
+| `color.surface.waiting` | `#F0EFEC` | `#201F1D` | "Needs you" panel fill (near neutral) |
 | `color.surface.control` | `#1F23280D` | `#FFFFFF0D` | Section switcher track (translucent) |
 | `color.surface.controlSelected` | `#F8F8F7` | `#2A3037` | Selected switcher segment, secondary button |
+| `color.surface.tag` | `#1F23280F` | `#FFFFFF0F` | Row tag fill (about 6 %) |
 | `color.border.subtle` | `#1F232814` | `#FFFFFF14` | Thin borders on controls |
+| `color.border.segment` | `#1F23281A` | `#FFFFFF1A` | Selected switcher segment border (about 10 %) |
 | `color.border.row` | `#1F23281F` | `#FFFFFF17` | Panel border |
 | `color.border.divider` | `#1F232812` | `#FFFFFF0D` | Hairline between rows |
-| `color.border.waiting` | `#8A530066` | `#E0A84E59` | Warning-tinted "Needs you" panel border |
+| `color.border.waiting` | `#8A53004D` | `#E0A84E4D` | Warning-tinted "Needs you" panel border (30 %) |
 | `color.text.primary` | `#1F2328` | `#E4E7EA` | Graphite main text |
 | `color.text.secondary` | `#545B65` | `#9AA2AC` | Labels, metadata, muted counts |
 | `color.text.onAccent` | `#1F2328` | `#14171B` | Text on the accent fill |
@@ -190,6 +215,7 @@ The Dark column shows the Fog Dark value. "=" means the light value.
 | `color.status.unknown` | `#6A5F52` | `#B3A797` | Unknown, starting |
 | `color.flag.noActivity` | `#8A5300` | `#E0A84E` | No-activity flag on a working row |
 | `color.shadow.panel` | `#1F23280F` | `#00000040` | Soft panel shadow |
+| `color.shadow.segment` | `#1F23280F` | `#00000033` | Selected switcher segment shadow (about 6 %) |
 | `color.surface.dock` | not set | not set | Reserved: dock fill (v0.2) |
 
 ### 5.2 Shape, space, and size
@@ -206,6 +232,9 @@ The Dark column shows the Fog Dark value. "=" means the light value.
 | `space.xxs` / `xs` / `sm` / `md` / `lg` / `xl` | `2` / `4` / `8` / `12` / `20` / `32` | Spacing scale |
 | `size.row.height` | `44` | Session row, main window |
 | `size.row.compactHeight` | `40` | Session row, menubar window |
+| `size.row.disclosureHeight` | `32` | "Earlier N" disclosure row in the Idle panel |
+| `size.child.indent` | `20` | Child title indent from the parent title |
+| `size.icon.empty` | `16` | Ice cube in the empty state |
 | `size.content.maxWidth` | `760` | Maximum width of the main window content column |
 | `size.icon.status` | `13` | Status glyph |
 | `size.status.column` | `16` | Width of the status glyph column, so titles align |
@@ -218,7 +247,7 @@ The Dark column shows the Fog Dark value. "=" means the light value.
 | `size.menu.width` | `360` | Menubar window width |
 | `size.menu.maxRows` | `5` | Rows in the menubar window before "+N more" |
 | `size.window.width` / `size.window.height` | `560` / `440` | Main window minimum size |
-| `size.window.defaultWidth` / `defaultHeight` | `880` / `640` | Main window size when it first opens |
+| `size.window.maxWidth` / `maxHeight` | `880` / `640` | Main window maximum size. It first opens at the maximum width. |
 | `size.welcome.width` | `480` | First-run window width. The height fits the content. |
 | `size.welcome.scenery` | `120` | Open band under the first-run content, where the scenery shows |
 | `size.welcome.sceneHeight` | `340` | Height of the scenery (ridges, fog) at the bottom of the first-run window |
@@ -232,11 +261,12 @@ The Dark column shows the Fog Dark value. "=" means the light value.
 | `opacity.atmosphere.scenery` | `1.0` | `1.0` | Scenery strength on key screens (High Contrast: `0.6`) |
 | `opacity.atmosphere.dense` | `0.55` | `0.7` | Multiplier on dense screens (High Contrast: `0.5`) |
 | `opacity.atmosphere.fog` | `0.7` | `0.7` | Fog band opacity at the band center |
-| `opacity.atmosphere.light` | `0.45` | `0.35` | Warm light strength (High Contrast: `0.2`) |
-| `blur.atmosphere.ridge` | `3` | = | Ridge softness. Far ridges use 2×, middle 1.5×. |
+| `opacity.atmosphere.light` | `0.45` | `0.2` | Warm light strength (High Contrast: `0.2`) |
+| `blur.atmosphere.ridge` | `3` | = | Ridge softness. The far ridge uses 1.5×, the middle 1.25×. |
 | `opacity.dock` / `blur.dock` | not set | not set | Reserved: dock material (v0.2) |
 | `blur.wallpaper` | not set | not set | Reserved: wallpaper blur background choice (8) |
 | `shadow.panel.radius` / `shadow.panel.y` | `12` / `2` | = | Soft panel shadow |
+| `shadow.segment.radius` / `shadow.segment.y` | `2` / `1` | = | Selected switcher segment shadow |
 | `font.family` | `system` | = | System font (SF Pro) |
 | `font.body.size` / `.weight` | `13` / `regular` | = | Body text |
 | `font.label.size` / `.weight` | `11` / `regular` | = | Metadata, line 2 of a row |
@@ -244,6 +274,10 @@ The Dark column shows the Fog Dark value. "=" means the light value.
 | `font.section.size` / `.weight` | `11` / `semibold` | = | Group headers |
 | `font.control.size` / `.weight` | `12` / `medium` | = | Switcher, buttons |
 | `font.tag.size` / `.weight` | `10` / `medium` | = | Row tags |
+| `font.hint.size` / `.weight` | `11` / `regular` | = | Shortcut hint (⌃⌥S) |
+| `font.reason.size` / `.weight` | `12` / `regular` | = | Waiting reason and other row notes, main window |
+| `font.calm.size` / `.weight` | `20` / `light` | = | "Nothing needs you." in the main window |
+| `font.calmCompact.size` / `.weight` | `15` / `light` | = | "Nothing needs you." in the menubar window |
 | `font.title.size` / `.weight` | `17` / `semibold` | = | Window titles |
 | `font.count.size` / `.weight` | `28` / `light` | = | Count line numbers. Always tabular digits. |
 | `font.countCompact.size` / `.weight` | `22` / `light` | = | Count line in the menubar window |
@@ -267,6 +301,7 @@ The Dark column shows the Fog Dark value. "=" means the light value.
 | `icon.action.openFolder` | `folder` |
 | `icon.disclosure` | `chevron.right` |
 | `icon.child` | `arrow.turn.down.right` |
+| `icon.empty` | `cube` (still outline ice cube, empty state) |
 | `icon.app` | `dot.radiowaves.left.and.right` |
 
 ## 6. Status display
@@ -375,7 +410,8 @@ Theme import must never crash Spyre and must never use the network.
 - The test checks text and status colors against every surface text sits on: `color.background.base`,
   `color.surface.card`, `color.surface.row`, `color.surface.rowHover`, `color.surface.waiting`,
   `color.surface.controlSelected`, the atmosphere tones (`sky`, `horizon`, `fog`), and the translucent
-  `color.surface.control` composed over `color.atmosphere.sky`. It also checks `color.text.onAccent` on `color.accent`.
+  `color.surface.control` composed over `color.atmosphere.sky`. It also checks the faint tag fill (`color.surface.tag`) composed over
+  `color.surface.row` and `color.surface.waiting`. It also checks `color.text.onAccent` on `color.accent`.
 - Text never sits on a ridge. Rows and panels are opaque, so the scenery behind them does not change contrast.
 - Check contrast against the card color composed over the background. For wallpaper blur, set `opacity.card` to at least 0.85. The wallpaper color is not known.
 - Imported themes: a theme that fails AA still loads. Spyre shows a warning for each failing text pair. Spyre does not change the colors. The user can switch back to a built-in theme at any time.

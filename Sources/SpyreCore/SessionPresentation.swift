@@ -10,7 +10,9 @@ public struct SessionRowText: Sendable, Equatable {
     public var branch: String?
     /// The agent name, for example `Claude Code`.
     public var agent: String
-    /// Short tags after line 2, for example `exec` or `experimental`.
+    /// The mode label, for example `exec`. Plain text at the end of line 2, not a tag.
+    public var mode: String?
+    /// Short tags after line 2, for example `experimental` or `stale`.
     public var tags: [String]
 
     /// - Parameters:
@@ -24,14 +26,16 @@ public struct SessionRowText: Sendable, Equatable {
         self.project = project
         self.branch = Self.branch(record.branch)
         self.agent = record.agent.title
-        let tags = isNested ? record.tags.filter { $0 != "child session" } : record.tags
+        let label = record.label?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        self.mode = label.isEmpty ? nil : label
+        let tags = record.tags.filter { $0 != record.label && !(isNested && $0 == "child session") }
         self.tags = tags + (record.isStale ? ["stale"] : [])
     }
 
-    /// Line 2: project · branch · agent. Empty parts are left out.
+    /// Line 2: project · branch · agent · mode. Empty parts are left out.
     /// The project is left out when the title already is the project name.
     public var detail: String {
-        [project == title ? nil : project, branch, agent].compactMap { $0 }.joined(separator: " · ")
+        [project == title ? nil : project, branch, agent, mode].compactMap { $0 }.joined(separator: " · ")
     }
 
     static func project(_ path: String, homeDirectory: String) -> String? {
@@ -124,12 +128,38 @@ public struct SessionSection: Sendable, Equatable, Identifiable {
     public var isCollapsible: Bool
     /// `false` when a collapsible group is folded. Its rows are then hidden.
     public var isExpanded: Bool
+    /// Idle rows older than `idleFoldAfter`, behind the "Earlier N" disclosure row. Empty in other groups.
+    public var earlierRows: [SessionListRow] = []
+    /// `true` when the user opened "Earlier".
+    public var isEarlierExpanded = false
 
     public var id: StatusGroup { group }
-    /// The number in the group header: top-level sessions. A nested child counts in its own status only.
-    public var count: Int { rows.filter { !$0.isNested }.count }
-    /// The rows to show. Empty while the group is folded.
+    /// The number in the group header: top-level sessions, "Earlier" ones too.
+    /// A nested child counts in its own status only.
+    public var count: Int { (rows + earlierRows).filter { !$0.isNested }.count }
+    /// The number on the "Earlier" disclosure row.
+    public var earlierCount: Int { earlierRows.filter { !$0.isNested }.count }
+    /// The rows to show above "Earlier". Empty while the group is folded.
     public var visibleRows: [SessionListRow] { isExpanded ? rows : [] }
+    /// `true` when the panel shows the "Earlier N" disclosure row.
+    public var showsEarlier: Bool { isExpanded && !earlierRows.isEmpty }
+    /// The "Earlier" rows to show. Empty while "Earlier" or the group is folded.
+    public var visibleEarlierRows: [SessionListRow] { showsEarlier && isEarlierExpanded ? earlierRows : [] }
+}
+
+/// How the Idle group folds old rows. `SPEC.md` 4.2.
+public struct IdleFold: Sendable, Equatable {
+    public var now: Date
+    /// Seconds after the last activity before an idle row moves into "Earlier".
+    public var after: TimeInterval
+    /// `true` when the user opened "Earlier".
+    public var isExpanded: Bool
+
+    public init(now: Date, after: TimeInterval, isExpanded: Bool = false) {
+        self.now = now
+        self.after = after
+        self.isExpanded = isExpanded
+    }
 }
 
 extension StatusGroup {
@@ -150,15 +180,33 @@ extension StatusGroup {
 
 extension Array where Element == SessionRecord {
     /// The session list as sections. A folded group keeps its header and count.
-    /// - Parameter expanded: the folded-by-default groups the user opened. Spyre keeps it in memory only.
-    public func sections(expanded: Set<StatusGroup> = []) -> [SessionSection] {
+    /// - Parameters:
+    ///   - expanded: the folded-by-default groups the user opened. Spyre keeps it in memory only.
+    ///   - idleFold: moves old idle rows into "Earlier". A nested child moves with its parent.
+    public func sections(expanded: Set<StatusGroup> = [], idleFold: IdleFold? = nil) -> [SessionSection] {
         grouped().map { group, rows in
             let collapsible = group.isCollapsedByDefault
-            return SessionSection(
+            var section = SessionSection(
                 group: group, rows: rows, isCollapsible: collapsible,
                 isExpanded: !collapsible || expanded.contains(group)
             )
+            if group == .idle, let fold = idleFold {
+                var parentIsOld = false
+                var recent: [SessionListRow] = []
+                for row in rows {
+                    if !row.isNested { parentIsOld = fold.now.timeIntervalSince(row.session.lastActivity) > fold.after }
+                    if parentIsOld { section.earlierRows.append(row) } else { recent.append(row) }
+                }
+                section.rows = recent
+                section.isEarlierExpanded = fold.isExpanded
+            }
+            return section
         }
+    }
+
+    /// The sessions the UI shows: idle sessions older than `idleHideAfter` are left out. `SPEC.md` 4.2.
+    public func visible(now: Date, config: SpyreConfig) -> [SessionRecord] {
+        filter { $0.status != .idle || now.timeIntervalSince($0.lastActivity) <= config.idleHideAfter }
     }
 
     /// The short list in the menubar window: Needs you first, then Working, at most `limit` rows.

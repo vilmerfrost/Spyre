@@ -49,6 +49,8 @@ final class AppModel {
     private(set) var tokens = Tokens.builtIn(Theme.builtInName(systemIsDark: AppModel.systemIsDark()))
     /// The folded-by-default groups (Idle, Done) the user opened. In memory only, for this app run.
     var expandedGroups: Set<StatusGroup> = []
+    /// `true` when the user opened "Earlier" in the Idle group. In memory only, for this app run.
+    var earlierExpanded = false
     private var appearanceObservation: NSKeyValueObservation?
     /// Decides when the first-run screen shows. `SPEC.md` 4.8.
     private let welcome: WelcomePresenter
@@ -80,7 +82,10 @@ final class AppModel {
     /// Claude Code and Codex, reading the real `~/.claude` and `~/.codex`.
     /// The hidden `-SpyreDemo` launch argument shows fake sessions instead (`FakeAdapter`).
     nonisolated static func realAdapters(config: SpyreConfig) -> [any AgentAdapter] {
-        if FakeAdapter.isRequested(arguments: ProcessInfo.processInfo.arguments) { return [FakeAdapter()] }
+        let arguments = ProcessInfo.processInfo.arguments
+        if FakeAdapter.isRequested(arguments: arguments) {
+            return [FakeAdapter(variant: FakeAdapter.variant(arguments: arguments))]
+        }
         let home = FileManager.default.homeDirectoryForCurrentUser
         let processes = SystemProcessScanner()
         return [
@@ -142,12 +147,29 @@ final class AppModel {
 
     /// The "Open Spyre" button, the global shortcut, and reopen.
     func showMainWindow() {
-        let size = CGSize(
-            width: tokens.value("size.window.defaultWidth"), height: tokens.value("size.window.defaultHeight")
+        let limits = HostedWindowController.SizeLimits(
+            min: CGSize(width: tokens.value("size.window.width"), height: tokens.value("size.window.height")),
+            max: CGSize(width: tokens.value("size.window.maxWidth"), height: tokens.value("size.window.maxHeight")),
+            autosaveName: "SpyreMainWindow"
         )
-        mainWindow.show(defaultSize: size, appearance: tokens.appearance) {
+        mainWindow.show(limits: limits, appearance: tokens.appearance) {
             ThemedRoot { MainWindowView() }.environment(self)
         }
+    }
+
+    /// The main window height follows its content. `DESIGN.md` 2.5.
+    func mainContentHeightChanged(_ height: CGFloat) {
+        mainWindow.fitHeight(height)
+    }
+
+    /// The sessions the UI shows: very old idle sessions are hidden. `SPEC.md` 4.2.
+    func visibleSessions(now: Date) -> [SessionRecord] {
+        sessions.visible(now: now, config: config)
+    }
+
+    /// "Quit Spyre" in the menubar window.
+    func quit() {
+        NSApp.terminate(nil)
     }
 
     /// Opens a session's working directory in Finder. Read-only: it only shows the folder. `SPEC.md` 4.3.

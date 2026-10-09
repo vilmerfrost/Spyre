@@ -10,6 +10,10 @@ public struct SpyreConfig: Sendable, Equatable {
     public var adapterRefreshTimeout: TimeInterval
     /// Seconds a `done` row stays in the list after the session ended.
     public var doneRowTimeout: TimeInterval
+    /// Seconds after its last activity before an idle row folds into "Earlier". `SPEC.md` 4.2.
+    public var idleFoldAfter: TimeInterval
+    /// Seconds after its last activity before an idle row is hidden. `SPEC.md` 4.2.
+    public var idleHideAfter: TimeInterval
     /// `true` after the user clicked "Start watching" on the first-run screen. `SPEC.md` 4.8.
     public var welcomeSeen: Bool
     /// The global shortcut that opens the main window.
@@ -22,6 +26,8 @@ public struct SpyreConfig: Sendable, Equatable {
         noActivityThreshold: TimeInterval = 10 * 60,
         adapterRefreshTimeout: TimeInterval = 2,
         doneRowTimeout: TimeInterval = 10 * 60,
+        idleFoldAfter: TimeInterval = 4 * 3_600,
+        idleHideAfter: TimeInterval = 24 * 3_600,
         welcomeSeen: Bool = false,
         hotkey: Hotkey = .default,
         showDockIcon: Bool = false
@@ -30,6 +36,8 @@ public struct SpyreConfig: Sendable, Equatable {
         self.noActivityThreshold = noActivityThreshold
         self.adapterRefreshTimeout = adapterRefreshTimeout
         self.doneRowTimeout = doneRowTimeout
+        self.idleFoldAfter = idleFoldAfter
+        self.idleHideAfter = idleHideAfter
         self.welcomeSeen = welcomeSeen
         self.hotkey = hotkey
         self.showDockIcon = showDockIcon

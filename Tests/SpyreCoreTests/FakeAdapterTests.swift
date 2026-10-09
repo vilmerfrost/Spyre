@@ -16,7 +16,7 @@ struct FakeAdapterTests {
 
     @Test func fakeAdapterReturnsFixedSessions() async {
         let snapshot = await FakeAdapter { now }.refresh()
-        #expect(snapshot.sessions.count == 7)
+        #expect(snapshot.sessions.count == 10)
         #expect(snapshot.sessions.waitingCount == 2)
         #expect(snapshot.diagnostics.isEmpty)
         #expect(snapshot.formatVersions["fake"] == "1")
@@ -39,6 +39,25 @@ struct FakeAdapterTests {
     @Test func demoArgumentSelectsFakeSessions() {
         #expect(FakeAdapter.isRequested(arguments: ["Spyre", "-SpyreDemo"]))
         #expect(!FakeAdapter.isRequested(arguments: ["Spyre"]))
+    }
+
+    @Test func demoVariantFollowsTheArgument() {
+        #expect(FakeAdapter.variant(arguments: ["Spyre", "-SpyreDemo"]) == .full)
+        #expect(FakeAdapter.variant(arguments: ["Spyre", "-SpyreDemo", "calm"]) == .calm)
+        #expect(FakeAdapter.variant(arguments: ["Spyre", "-SpyreDemo", "Empty"]) == .empty)
+        #expect(FakeAdapter.variant(arguments: ["Spyre", "-SpyreDemo", "-SpyreAppearance", "dark"]) == .full)
+    }
+
+    @Test func demoVariantsGiveTheirSessions() async {
+        #expect(await FakeAdapter(variant: .empty) { now }.refresh().sessions.isEmpty)
+        let calm = await FakeAdapter(variant: .calm) { now }.refresh().sessions
+        #expect(calm.waitingCount == 0)
+        #expect(calm.allSatisfy { $0.workingDirectory.hasPrefix("/Users/you/") })
+        let visible = calm.visible(now: now, config: .default)
+        #expect(visible.count == calm.count - 1)
+        let idle = visible.sections(expanded: [.idle], idleFold: IdleFold(now: now, after: 4 * 3_600))
+            .first { $0.group == .idle }
+        #expect(idle?.earlierCount == 2)
     }
 
     @Test func fakeSessionsCoverEveryRowKind() {

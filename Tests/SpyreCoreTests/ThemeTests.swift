@@ -28,6 +28,12 @@ struct ThemeTests {
         let track = try #require(theme.color("color.surface.control"))
         let sky = try #require(theme.color("color.atmosphere.sky"))
         backgrounds.append(("color.surface.control over sky", track.composited(over: sky)))
+        // Row tags are a faint fill on the row and "Needs you" surfaces.
+        let tag = try #require(theme.color("color.surface.tag"))
+        for surface in ["color.surface.row", "color.surface.waiting"] {
+            let base = try #require(theme.color(surface))
+            backgrounds.append(("color.surface.tag over \(surface)", tag.composited(over: base)))
+        }
         for (background, back) in backgrounds {
             #expect(back.alpha == 1, "\(name): \(background) must be opaque")
             for token in foregrounds {
@@ -62,13 +68,28 @@ struct ThemeTests {
         "opacity.atmosphere.light", "blur.atmosphere.ridge",
         "radius.panel", "radius.row", "radius.button", "radius.tag", "space.xxs",
         "size.row.height", "size.row.compactHeight", "size.content.maxWidth", "size.status.column",
-        "size.spinner.line", "size.switcher.height", "size.window.defaultWidth", "size.window.defaultHeight",
+        "size.spinner.line", "size.switcher.height", "size.window.maxWidth", "size.window.maxHeight",
+        "size.row.disclosureHeight", "size.child.indent", "size.icon.empty", "icon.empty",
+        "color.surface.tag", "color.border.segment", "color.shadow.segment", "shadow.segment.radius",
+        "shadow.segment.y", "font.hint.size", "font.reason.size", "font.calm.size", "font.calmCompact.size",
         "size.menu.maxRows", "size.atmosphere.drift", "size.welcome.scenery", "size.welcome.sceneHeight",
         "shadow.panel.radius", "shadow.panel.y",
         "font.rowTitle.size", "font.section.size", "font.control.size", "font.tag.size", "font.count.size",
         "font.countCompact.size", "font.count.weight", "motion.duration.drift",
         "icon.action.openFolder", "icon.disclosure", "icon.child",
     ]
+
+    /// Pixel fixes 2 and 11: the "Needs you" border is about 30 % alpha, and the dark warm light is faint.
+    @Test func waitingBorderAndDarkLightAreQuiet() throws {
+        for name in ["light", "dark"] {
+            let border = try #require(Theme.builtIn(name).color("color.border.waiting"))
+            #expect(abs(border.alpha - 0.3) < 0.02, "\(name)")
+        }
+        #expect(try Theme.builtIn("dark").number("opacity.atmosphere.light") == 0.2)
+        let light = try Theme.builtIn("light")
+        #expect(light.string("font.reason.weight") == "regular")
+        #expect(light.number("font.hint.size") == 11)
+    }
 
     @Test func darkAndLightAreDifferentAppearances() throws {
         #expect(try !Theme.builtIn("light").isDark)
