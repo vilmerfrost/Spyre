@@ -1,0 +1,4 @@
+{"type":"user","timestamp":"2027-01-15T08:02:00.000Z","sessionId":"00000000-0000-0000-0000-0000000000c1","cwd":"/Users/you/Projects/app","gitBranch":"main","message":{"role":"user","content":"fake prompt"}}
+{"type":"assistant","timestamp":"2027-01-15T08:02:05.000Z","sessionId":"00000000-0000-0000-0000-0000000000c1","cwd":"/Users/you/Projects/app","gitBranch":"main","message":{"role":"assistant","stop_reason":"end_turn","content":[{"type":"text","text":"fake"}]}}
+{"type":"user","timestamp":"2027-01-15T08:03:00.000Z","sessionId":"00000000-0000-0000-0000-0000000000c1","cwd":"/Users/you/Projects/app","gitBranch":"main","message":{"role":"user","content":"fake prompt"}}
+{"type":"assistant","timestamp":"2027-01-15T08:03:0

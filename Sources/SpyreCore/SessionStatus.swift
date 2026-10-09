@@ -61,6 +61,8 @@ public struct SessionRecord: Sendable, Identifiable, Equatable {
     public var parentID: String?
     /// The adapter refresh timed out. The row shows its last state with a "stale" mark.
     public var isStale: Bool
+    /// A child session (`SPEC.md` 4.6, EXPERIMENTAL). With no `parentID`, the row shows "child, no parent".
+    public var isChildSession: Bool
 
     public init(
         id: String,
@@ -72,7 +74,8 @@ public struct SessionRecord: Sendable, Identifiable, Equatable {
         waitingReason: String? = nil,
         lastActivity: Date,
         parentID: String? = nil,
-        isStale: Bool = false
+        isStale: Bool = false,
+        isChildSession: Bool = false
     ) {
         self.id = id
         self.agent = agent
@@ -84,6 +87,7 @@ public struct SessionRecord: Sendable, Identifiable, Equatable {
         self.lastActivity = lastActivity
         self.parentID = parentID
         self.isStale = isStale
+        self.isChildSession = isChildSession
     }
 
     /// The last path component of the working directory.
