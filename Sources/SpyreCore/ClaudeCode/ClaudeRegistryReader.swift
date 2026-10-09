@@ -5,6 +5,8 @@ struct ClaudeRegistryEntry: Decodable, Sendable, Equatable {
     var pid: Int32?
     var sessionId: String?
     var cwd: String?
+    /// The session title. Shown locally only. Never logged.
+    var name: String?
     var startedAt: Double?
     var procStart: String?
     var version: String?

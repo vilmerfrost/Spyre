@@ -58,19 +58,3 @@ struct SessionRow: View {
         return parts.joined(separator: " · ")
     }
 }
-
-extension StatusGroup {
-    var title: String {
-        switch self {
-        case .waiting: "Waiting"
-        case .working: "Working"
-        case .idle: "Idle"
-        case .unknown: "Unknown"
-        case .done: "Done"
-        }
-    }
-}
-
-extension AgentType {
-    var title: String { self == .claudeCode ? "Claude Code" : "Codex" }
-}

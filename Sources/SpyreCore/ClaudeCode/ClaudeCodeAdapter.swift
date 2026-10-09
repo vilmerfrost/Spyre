@@ -152,6 +152,7 @@ public actor ClaudeCodeAdapter: AgentAdapter {
         if let entry = read.entry {
             if let id = entry.sessionId { item.record.id = id }
             if let cwd = entry.cwd { item.record.workingDirectory = cwd }
+            if let name = entry.name { item.record.title = name }
             if let date = entry.lastActivity { item.record.lastActivity = date }
             if let cwd = entry.cwd, let id = entry.sessionId,
                let summary = transcripts.summary(cwd: cwd, sessionID: id) {

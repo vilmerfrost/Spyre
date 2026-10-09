@@ -1,7 +1,7 @@
 import Foundation
 import SQLite3
 
-/// One row of the Codex `threads` table. Holds no titles or messages.
+/// One row of the Codex `threads` table. Holds no messages.
 struct CodexThread: Sendable, Equatable {
     var id: String
     var rolloutPath: String
@@ -13,6 +13,8 @@ struct CodexThread: Sendable, Equatable {
     var source: String?
     /// `threads.originator`, for example `codex-tui`, `codex_exec`, or `Codex Desktop`.
     var originator: String?
+    /// `threads.title`. Codex can derive it from the first prompt. Shown locally only. Never logged.
+    var title: String? = nil
 }
 
 /// Reads `~/.codex/state_<n>.sqlite`, table `threads`. `SPEC.md` 5.2 A.
@@ -49,7 +51,7 @@ struct CodexThreadIndex: Sendable {
 
         // Later columns. Older schemas may not have them.
         let columns = columnNames(db)
-        let optional = ["cli_version", "source", "originator"]
+        let optional = ["cli_version", "source", "originator", "title"]
             .map { columns.contains($0) ? $0 : "NULL" }.joined(separator: ", ")
         let sql = """
             SELECT id, rollout_path, cwd, git_branch, updated_at_ms, \(optional)
@@ -75,7 +77,8 @@ struct CodexThreadIndex: Sendable {
                 updatedAt: Date(timeIntervalSince1970: Double(sqlite3_column_int64(query, 4)) / 1000),
                 cliVersion: text(query, 5),
                 source: text(query, 6),
-                originator: text(query, 7)
+                originator: text(query, 7),
+                title: text(query, 8)
             ))
         }
         return .success(rows)
