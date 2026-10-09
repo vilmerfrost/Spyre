@@ -64,6 +64,23 @@ struct ConfigFileTests {
         #expect(high.warnings.count == 1)
     }
 
+    @Test func idleFoldAndHideDefaultsInvalidAndClamp() {
+        #expect(SpyreConfig.default.idleFoldAfter == 14_400)
+        #expect(SpyreConfig.default.idleHideAfter == 86_400)
+        let valid = load(#"{"idleFoldAfter":7200,"idleHideAfter":172800}"#)
+        #expect(valid.config.idleFoldAfter == 7_200)
+        #expect(valid.config.idleHideAfter == 172_800)
+        #expect(valid.warnings.isEmpty)
+        let wrong = load(#"{"idleFoldAfter":"4h","idleHideAfter":false}"#)
+        #expect(wrong.config.idleFoldAfter == 14_400)
+        #expect(wrong.config.idleHideAfter == 86_400)
+        #expect(wrong.warnings.count == 2)
+        let clamped = load(#"{"idleFoldAfter":1,"idleHideAfter":99999999}"#)
+        #expect(clamped.config.idleFoldAfter == 60)
+        #expect(clamped.config.idleHideAfter == 604_800)
+        #expect(clamped.warnings.count == 2)
+    }
+
     @Test func missingFileIsCreatedWithDefaults() throws {
         let folder = tempFolder()
         defer { try? FileManager.default.removeItem(at: folder) }

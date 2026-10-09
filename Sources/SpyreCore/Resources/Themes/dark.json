@@ -14,13 +14,15 @@
     "color.surface.card": "#1C2025",
     "color.surface.row": "#1C2025",
     "color.surface.rowHover": "#22272D",
-    "color.surface.waiting": "#221F1A",
+    "color.surface.waiting": "#201F1D",
     "color.surface.control": "#FFFFFF0D",
     "color.surface.controlSelected": "#2A3037",
+    "color.surface.tag": "#FFFFFF0F",
     "color.border.subtle": "#FFFFFF14",
+    "color.border.segment": "#FFFFFF1A",
     "color.border.row": "#FFFFFF17",
     "color.border.divider": "#FFFFFF0D",
-    "color.border.waiting": "#E0A84E59",
+    "color.border.waiting": "#E0A84E4D",
     "color.text.primary": "#E4E7EA",
     "color.text.secondary": "#9AA2AC",
     "color.text.onAccent": "#14171B",
@@ -33,9 +35,10 @@
     "color.status.unknown": "#B3A797",
     "color.flag.noActivity": "#E0A84E",
     "color.shadow.panel": "#00000040",
+    "color.shadow.segment": "#00000033",
     "opacity.atmosphere.scenery": 1.0,
     "opacity.atmosphere.dense": 0.7,
     "opacity.atmosphere.fog": 0.7,
-    "opacity.atmosphere.light": 0.35
+    "opacity.atmosphere.light": 0.2
   }
 }

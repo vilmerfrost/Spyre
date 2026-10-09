@@ -34,11 +34,11 @@ struct AtmosphereView: View {
                 )
                 ZStack {
                     warmLight(size)
-                    ridge(0, "color.atmosphere.ridgeFar", blurScale: 2)
+                    ridge(0, "color.atmosphere.ridgeFar")
                     fogBand(0, size: size, direction: -1)
-                    ridge(1, "color.atmosphere.ridgeMid", blurScale: 1.5)
+                    ridge(1, "color.atmosphere.ridgeMid")
                     fogBand(1, size: size, direction: 1)
-                    ridge(2, "color.atmosphere.ridgeNear", blurScale: 1)
+                    ridge(2, "color.atmosphere.ridgeNear")
                 }
                 .frame(width: size.width, height: size.height)
             }
@@ -64,10 +64,10 @@ struct AtmosphereView: View {
         )
     }
 
-    private func ridge(_ index: Int, _ color: String, blurScale: CGFloat) -> some View {
+    private func ridge(_ index: Int, _ color: String) -> some View {
         RidgeShape(heights: Atmosphere.ridges[index].heights)
             .fill(tokens.color(color))
-            .blur(radius: tokens.value("blur.atmosphere.ridge") * blurScale)
+            .blur(radius: tokens.value("blur.atmosphere.ridge") * Atmosphere.ridgeBlurScales[index])
             .opacity(strength)
     }
 

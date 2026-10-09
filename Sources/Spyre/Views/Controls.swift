@@ -43,9 +43,12 @@ struct SectionSwitcher: View {
                         Capsule()
                             .fill(tokens.color("color.surface.controlSelected"))
                             .overlay(Capsule().strokeBorder(
-                                tokens.color("color.border.subtle"), lineWidth: tokens.value("size.border")
+                                tokens.color("color.border.segment"), lineWidth: tokens.value("size.border")
                             ))
-                            .shadow(color: tokens.color("color.shadow.panel"), radius: tokens.value("space.xxs"))
+                            .shadow(
+                                color: tokens.color("color.shadow.segment"),
+                                radius: tokens.value("shadow.segment.radius"), y: tokens.value("shadow.segment.y")
+                            )
                             .matchedGeometryEffect(id: "selection", in: selectionSpace)
                     }
                 }
@@ -99,6 +102,8 @@ struct SpyreButtonStyle: ButtonStyle {
 /// Under Reduce Motion the spinner is a static partial arc. `DESIGN.md` 10.3.
 struct StatusGlyph: View {
     let status: SessionStatus
+    /// The size token of the glyph column. A nested child row uses the glyph size, so its title indent stays small.
+    var column = "size.status.column"
     @Environment(\.tokens) private var tokens
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -117,7 +122,7 @@ struct StatusGlyph: View {
                     .foregroundStyle(tokens.statusColor(status))
             }
         }
-        .frame(width: tokens.value("size.status.column"), height: tokens.value("size.status.column"))
+        .frame(width: tokens.value(column), height: tokens.value("size.status.column"))
         .accessibilityHidden(true)
     }
 }
@@ -181,7 +186,7 @@ final class SpinnerLayerView: NSView {
     }
 }
 
-/// A small bordered tag on a row: `exec`, `experimental`, `stale`.
+/// A small quiet tag on a row: `experimental`, `stale`. No border, a faint fill.
 struct RowTag: View {
     let text: String
     @Environment(\.tokens) private var tokens
@@ -191,10 +196,7 @@ struct RowTag: View {
             .font(tokens.font("tag"))
             .foregroundStyle(tokens.color("color.text.secondary"))
             .padding(.horizontal, tokens.value("space.xs"))
-            .overlay(
-                RoundedRectangle(cornerRadius: tokens.value("radius.tag"))
-                    .strokeBorder(tokens.color("color.border.row"), lineWidth: tokens.value("size.border"))
-            )
+            .background(tokens.color("color.surface.tag"), in: RoundedRectangle(cornerRadius: tokens.value("radius.tag")))
     }
 }
 

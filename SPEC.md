@@ -42,7 +42,7 @@ It never starts, stops, or changes an agent session.
 
 | Surface | Content | In MVP |
 |---------|---------|--------|
-| Menubar item | Spyre icon and a badge. Its window shows the count line, the top rows (Needs you, then Working, at most `size.menu.maxRows`), "Open Spyre", and "Show welcome screen". | Yes |
+| Menubar item | Spyre icon and a badge. Its window shows the count line, the top rows (Needs you, then Working, at most `size.menu.maxRows`), "N more in Spyre", "Open Spyre", the shortcut, and a "More" menu with "Show welcome screen" and "Quit Spyre" (⌘Q). | Yes |
 | Main window | A pill section switcher (Radar, Grab, Lab) and the shortcut hint. Radar shows the count line and the session list (4.2). Grab and Lab show "Coming soon". | Yes |
 | Welcome window | The first-run screen (4.8). | Yes |
 | macOS Dock icon | Not the dock strip above. Off by default. `showDockIcon` (4.4) turns it on. A click opens the main window. | Yes |
@@ -66,8 +66,9 @@ AppKit code (reopen, the shortcut) cannot open a SwiftUI `Window` scene reliably
 
 ### 4.1 Menubar item with badge
 
-- Show a Spyre icon in the menubar.
-- The badge counts sessions in the `waiting` state only.
+- Show a Spyre icon in the menubar: a monochrome template icon. It never changes color.
+- The badge counts sessions in the `waiting` state only. The label is the icon only at 0, the icon and the number
+  at 1 to 9, and "9+" from 10. VoiceOver reads "Spyre, 2 waiting".
 - `idle` and `done` sessions never count in the badge. They show in the list only.
 - Hide the badge when the count is 0.
 - Update the badge as soon as a status changes. Do not delay it.
@@ -84,9 +85,18 @@ Spyre must never assume that a `waiting` state stays.
 
 Click the menubar icon to open the short list. The Radar section in the main window shows the full list.
 
-**Count line.** Above the list: "N needs you", "N working", "N idle", in big numbers with tabular digits.
-"Needs you" counts `waiting` sessions (the badge number). "Working" counts `working` and `starting`.
-All three always show, so the line does not shift. Only a non-zero "needs you" uses the waiting color.
+**Count line.** Above the list. "Needs you" counts `waiting` sessions (the badge number). "Working" counts
+`working` and `starting`.
+
+- When at least one session needs you: "N needs you", "N working", "N idle", in big numbers with tabular digits.
+  All three show. Only "needs you" uses the waiting color.
+- When nothing needs you: one line, "Nothing needs you." in the secondary text color (no waiting color),
+  then a short summary, for example "1 working · 7 idle". Zero parts are left out.
+- Hidden idle sessions (below) do not count.
+
+**No sessions.** When no session shows, the Radar section shows "Nothing running." and
+"Start Claude Code or Codex in a terminal. Spyre shows it here within a few seconds.", with a still ice cube.
+The menubar window shows "Nothing running.".
 
 Each row shows:
 
@@ -120,6 +130,10 @@ Group the rows by status. Show the groups in this order, each with a header:
 - A group header shows the number of top-level rows in the group.
 - Idle and Done are folded by default. Their header is a disclosure row with the count. A click unfolds the group.
   Spyre remembers unfolded groups in memory for the app run only. Reason: these rows need no action.
+- Old idle rows: an idle row whose last activity is older than `idleFoldAfter` (4 h) moves into an
+  "Earlier N" disclosure row at the end of the Idle group, folded by default (in memory, like the groups).
+  An idle session older than `idleHideAfter` (24 h) is hidden. A nested child moves with its parent row.
+  The group header count includes "Earlier" rows and leaves out hidden ones.
 - Freeze the row order while the pointer is over the list. Rows must not move under the pointer. Status text and badges still update. Apply the new order when the pointer leaves the list.
 - Reason: rows that jump under the pointer cause wrong clicks. Another session monitor removed status sorting for this reason (`research/competitors.md`).
 
@@ -172,6 +186,8 @@ Spyre stores these values in its config, not in code:
 | `noActivityThreshold` | 10 min | No-activity flag (4.4) |
 | `adapterRefreshTimeout` | 2 s | Stale mark (4.4, 6.4) |
 | `doneRowTimeout` | 10 min | Hiding `done` rows (4.4) |
+| `idleFoldAfter` | 4 h | Folding old idle rows into "Earlier" (4.2) |
+| `idleHideAfter` | 24 h | Hiding very old idle rows (4.2) |
 | `welcomeSeen` | `false` | First-run screen (4.8) |
 
 The MVP has no settings UI for these values.
@@ -185,6 +201,8 @@ Spyre reads the values from `~/Library/Application Support/Spyre/config.json`.
   "alertDelay" : 3,
   "doneRowTimeout" : 600,
   "hotkey" : "ctrl+opt+s",
+  "idleFoldAfter" : 14400,
+  "idleHideAfter" : 86400,
   "noActivityThreshold" : 600,
   "showDockIcon" : false,
   "welcomeSeen" : false
@@ -211,6 +229,8 @@ Spyre reads the values from `~/Library/Application Support/Spyre/config.json`.
 | `noActivityThreshold` | 60 – 86400 |
 | `adapterRefreshTimeout` | 0.5 – 60 |
 | `doneRowTimeout` | 0 – 86400 |
+| `idleFoldAfter` | 60 – 604800 |
+| `idleHideAfter` | 60 – 604800 |
 
 | Key | Default | Meaning |
 |-----|---------|---------|
@@ -227,6 +247,10 @@ Spyre registers the shortcut with Carbon `RegisterEventHotKey`. It needs no Acce
 Spyre registers it again when the value changes. When macOS refuses the shortcut, Spyre logs a warning
 (category `config`), shows it as a config warning, and keeps running.
 Limit: macOS does not report a shortcut that another app also registered. Both apps then get it, or only one.
+
+Spyre stores the main window frame with the `NSWindow` frame autosave name `SpyreMainWindow`. macOS keeps it
+in Spyre's own preferences domain (`io.github.vilmerfrost.spyre`), not in `config.json`. This is the one
+exception to "Spyre writes only inside its Application Support folder"; Spyre writes no other preference.
 
 Spyre writes to the file in one case only: "Start watching" on the first-run screen (4.8).
 It reads the file, sets `welcomeSeen` to `true`, and keeps every other key, unknown keys too.

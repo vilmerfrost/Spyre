@@ -76,8 +76,18 @@ struct PresentationTests {
         child.isChildSession = true
         child.parentID = "p"
         child.isStale = true
-        #expect(SessionRowText(child, homeDirectory: home).tags == ["exec", "child session", "experimental", "stale"])
-        #expect(SessionRowText(child, homeDirectory: home, isNested: true).tags == ["exec", "experimental", "stale"])
+        #expect(SessionRowText(child, homeDirectory: home).tags == ["child session", "experimental", "stale"])
+        #expect(SessionRowText(child, homeDirectory: home, isNested: true).tags == ["experimental", "stale"])
+    }
+
+    /// Pixel fix 7: "exec" is plain text at the end of line 2, not a tag.
+    @Test func execIsPlainTextOnLineTwo() {
+        var exec = record("e", .working, branch: "main")
+        exec.label = "exec"
+        let text = SessionRowText(exec, homeDirectory: home)
+        #expect(text.mode == "exec")
+        #expect(text.detail == "main · Claude Code · exec")
+        #expect(!text.tags.contains("exec"))
     }
 
     @Test func menuRowKeepsChildInParentsGroup() {
@@ -162,6 +172,20 @@ struct PresentationTests {
     }
 
     // MARK: Atmosphere geometry
+
+    /// Pixel fix 12: the scenery stays in the lower third, and the far peak is off the center axis.
+    @Test func sceneryStaysLowAndFarPeakIsOffCenter() throws {
+        for ridge in Atmosphere.ridges {
+            #expect(ridge.heights.allSatisfy { $0 >= 2.0 / 3 - 0.001 })
+        }
+        let far = Atmosphere.ridges[0].heights
+        let top = try #require(far.min())
+        let index = try #require(far.firstIndex(of: top))
+        let x = Double(index) / Double(far.count - 1)
+        #expect(abs(x - 0.5) > 0.12)
+        #expect(Atmosphere.fogBands.allSatisfy { $0.y >= 2.0 / 3 })
+        #expect(Atmosphere.ridgeBlurScales == Atmosphere.ridgeBlurScales.sorted(by: >))
+    }
 
     @Test func ridgesStayInsideTheViewAndFarRidgeIsHighest() throws {
         #expect(Atmosphere.ridges.count == 3)
