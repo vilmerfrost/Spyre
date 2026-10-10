@@ -323,6 +323,24 @@ A `PermissionRequest` hook from another tool can answer a prompt in about 2 s (v
 - Use: git branch, a fallback for last activity, and child session discovery (4.6).
 - Read only the tail of the file. Never parse message content.
 
+**D. Process names**
+
+Verified on one Mac with `proc_name` and `proc_pidpath` (example paths are fake):
+
+| Host | `proc_name` | Executable path (`proc_pidpath`) | Parent process |
+|------|-------------|-----------------------------------|----------------|
+| CLI, native installer | the version, for example `2.1.295` | `~/.local/share/claude/versions/<version>` | the shell |
+| Desktop app | `claude` | `~/Library/Application Support/Claude/claude-code/<version>/<hash>/claude.app/Contents/MacOS/claude` | `/Applications/Claude.app/Contents/Helpers/disclaimer` |
+| VS Code extension | `claude` | `~/.vscode/extensions/anthropic.claude-code-<version>-<platform>/resources/native-binary/claude` | not observed |
+
+Rules for the process scan:
+
+- Do not match on `proc_name` alone. The CLI name is a version string.
+- Match on the executable path. A Claude Code process has a path that ends in `/claude`, or that matches `/.local/share/claude/versions/<version>`.
+- Cursor uses the same extension layout under `~/.cursor/extensions/` (verified: files only).
+- An npm install runs Claude Code under `node`. The path is then the Node binary (inferred, not tested). The MVP does not support npm installs in the process scan. Those sessions still show from the registry file.
+- The VS Code row is verified by running the extension binary directly. The parent process inside VS Code is not verified.
+
 ### 5.2 Codex
 
 **A. Thread index**
@@ -535,10 +553,6 @@ Before Lab work starts:
 
 1. How stable are these formats across versions? We need fixture files per version in tests.
 2. How does Spyre show a Codex desktop thread more reliably than "ChatGPT runs and recent update"?
-
-**Resolve in the first code PR**
-
-- UNKNOWN: the process name of a Claude Code process on each host (CLI, desktop, VS Code). The process scan (4.6) needs it.
 
 **Later**
 
