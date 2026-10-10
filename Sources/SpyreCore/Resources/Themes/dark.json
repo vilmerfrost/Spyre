@@ -1,0 +1,18 @@
+{
+  "spyreTheme": 1,
+  "name": "Fog Dark",
+  "appearance": "dark",
+  "tokens": {
+    "color.background.base": "#16181B",
+    "color.surface.card": "#22252A",
+    "color.border.subtle": "#FFFFFF1A",
+    "color.text.primary": "#E8EAED",
+    "color.text.secondary": "#A6ADB8",
+    "color.accent": "#7FA6CC",
+    "color.status.working": "#7FB0E8",
+    "color.status.waiting": "#E3A94B",
+    "color.status.idle": "#A0A7B1",
+    "color.status.done": "#6CC48B",
+    "color.status.unknown": "#B8AC9C"
+  }
+}

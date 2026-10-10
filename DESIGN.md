@@ -126,6 +126,8 @@ The dark and high-contrast themes set their own values.
 | `size.dock.ring` | `2.5` | Status ring line width |
 | `size.dock.maxIcons` | `6` | Icons before "+N" |
 | `size.border` | `1` | Border width |
+| `size.menu.width` | `320` | Menubar window width |
+| `size.window.width` / `size.window.height` | `720` / `480` | Main window minimum size |
 
 ### 5.3 Material, font, and motion
 
@@ -159,6 +161,7 @@ The dark and high-contrast themes set their own values.
 | `icon.status.done` | `checkmark.circle` |
 | `icon.status.unknown` | `questionmark.circle` |
 | `icon.flag.noActivity` | `clock.badge.exclamationmark` |
+| `icon.app` | `dot.radiowaves.left.and.right` |
 
 ## 6. Status display
 
